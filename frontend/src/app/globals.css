@@ -7,5 +7,6 @@
 }
 
 body {
-  @apply bg-slate-100 text-slate-900;
+  @apply text-slate-900;
+  background: radial-gradient(circle at top, #e0e7ff 0%, #f8fafc 35%, #f8fafc 100%);
 }

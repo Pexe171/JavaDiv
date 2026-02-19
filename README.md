@@ -179,25 +179,17 @@ Mapeamento aplicado para rotas `/api/**`, incluindo métodos `GET`, `POST`, `PUT
 
 ### Front-end (Next.js + Tailwind CSS)
 
-Foi adicionado o módulo web em `frontend/` com:
+O módulo web em `frontend/` foi simplificado para um fluxo de disparo rápido:
 
-- Next.js (App Router)
-- Tailwind CSS
-- React Hooks (`useState`, `useEffect`, `useMemo`) para estado da campanha, polling e status da API
-- Editor de conteúdo com campos de **Título**, **Assunto** e editor rich text (HTML)
-- Interface de agendamento com seletor de data/hora para envio em `POST /api/campaigns/{id}/schedule`
-- Botão de **Disparar Agora** integrado ao endpoint `POST /api/campaigns/{id}/send-now`, com modal de confirmação e fundo com efeito de desfoque (blur) para reduzir risco de clique acidental
-- Leitura dos parâmetros de lote vindos do back-end em `GET /api/campaigns/config`
-- Ajuste dinâmico dos parâmetros de lote via campos numéricos e sliders no front-end, com persistência em `PUT /api/campaigns/config`
-- Painel de monitoramento em tempo real (polling de status a cada poucos segundos)
-- Painel de **ciclo de vida da campanha** com etapas visuais (criação, programação, disparo e finalização)
-- Barra de progresso visual com estados:
-  - Verde: enviados (`sent`)
-  - Vermelho: falhas (`failed`)
-  - Cinza animado: pendentes (`pending`)
-- Console de erros rolável com logs de falha (`errorMessage`) por destinatário
-- Tabela de **higienização visual da base** com faixa amarela para contatos descadastrados (`unsubscribedAt` não nulo) e status textual **Descadastrado**
-- Zona de **importação Drag & Drop** para arquivos `.txt`, leitura local com `FileReader`, envio para `POST /api/contacts/import-lines` e resumo animado de processamento (importados, inválidos e duplicados)
+- Interface minimalista e chamativa para **envio de e-mail de live no TikTok**
+- Formulário com **apenas 1 campo**: link da live
+- Geração automática de campanha com:
+  - título padrão com data atual
+  - assunto padrão para chamada de live ao vivo
+  - HTML de e-mail pré-pronto com botão **"Clique aqui para assistir"**
+- Disparo imediato logo após criação, usando `POST /api/campaigns` + `POST /api/campaigns/{id}/send-now`
+- Prévia visual do botão para validar rapidamente o link informado
+- Mensagens claras de sucesso/erro na própria tela
 
 #### Executar front-end
 

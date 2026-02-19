@@ -182,6 +182,9 @@ Mapeamento aplicado para rotas `/api/**`, incluindo métodos `GET`, `POST`, `PUT
 O módulo web em `frontend/` foi simplificado para um fluxo de disparo rápido:
 
 - Interface minimalista e chamativa para **envio de e-mail de live no TikTok**
+- Bloco de **importação de contatos** com colagem em massa (1 e-mail por linha)
+- Tratamento inteligente da importação: em entradas como `email@dominio.com:dados`, o sistema considera apenas o trecho antes de `:`
+- Contador em tempo real com total de e-mails únicos identificados para importação
 - Formulário com **apenas 1 campo**: link da live
 - Geração automática de campanha com:
   - título padrão com data atual

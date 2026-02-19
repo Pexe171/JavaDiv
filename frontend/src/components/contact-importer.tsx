@@ -49,10 +49,31 @@ function montarEmailHtml(linkLive: string): string {
 
 export function ContactImporter() {
   const [liveLink, setLiveLink] = useState("");
+  const [contactsRawInput, setContactsRawInput] = useState("");
+  const [isImportingContacts, setIsImportingContacts] = useState(false);
+  const [importFeedback, setImportFeedback] = useState<string | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [totalEmailsImportados, setTotalEmailsImportados] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [campaign, setCampaign] = useState<CampaignResponse | null>(null);
+
+  const emailsPreparadosParaImportacao = useMemo(() => {
+    const linhas = contactsRawInput.split(/\r?\n/);
+    const unicos = new Set<string>();
+
+    for (const linha of linhas) {
+      const emailAntesDeDoisPontos = linha.split(":")[0]?.trim().toLowerCase();
+      if (!emailAntesDeDoisPontos) {
+        continue;
+      }
+
+      unicos.add(emailAntesDeDoisPontos);
+    }
+
+    return Array.from(unicos);
+  }, [contactsRawInput]);
 
   const previewLink = useMemo(() => {
     if (!liveLink.trim()) {
@@ -110,6 +131,39 @@ export function ContactImporter() {
     }
   };
 
+  const importarContatos = async () => {
+    setImportError(null);
+    setImportFeedback(null);
+
+    if (emailsPreparadosParaImportacao.length === 0) {
+      setImportError("Cole pelo menos um e-mail para importar.");
+      return;
+    }
+
+    setIsImportingContacts(true);
+
+    try {
+      const response = await fetch(`${API_URL}/api/contacts/import-lines`, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain" },
+        body: emailsPreparadosParaImportacao.join("\n"),
+      });
+
+      if (!response.ok) {
+        const message = await response.text();
+        throw new Error(message || "Falha ao importar contatos.");
+      }
+
+      setImportFeedback(`Importação concluída com ${emailsPreparadosParaImportacao.length} e-mail(s) processado(s).`);
+      setTotalEmailsImportados(emailsPreparadosParaImportacao.length);
+      setContactsRawInput("");
+    } catch (requestError) {
+      setImportError(requestError instanceof Error ? requestError.message : "Erro inesperado ao importar contatos.");
+    } finally {
+      setIsImportingContacts(false);
+    }
+  };
+
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-4xl items-center px-6 py-10">
       <section className="w-full rounded-3xl border border-slate-200 bg-white p-8 shadow-xl shadow-indigo-100/50">
@@ -118,6 +172,37 @@ export function ContactImporter() {
         <p className="mt-3 text-slate-600">
           Informe somente o link da live. O sistema gera um e-mail bonito com botão <strong>&ldquo;Clique aqui para assistir&rdquo;</strong> e dispara na hora.
         </p>
+
+        <article className="mt-8 rounded-2xl border border-slate-200 bg-slate-50 p-5">
+          <h2 className="text-base font-bold text-slate-900">Importar base de e-mails</h2>
+          <p className="mt-2 text-sm text-slate-600">
+            Cole 1 e-mail por linha. Se vier no formato <code>email:qualquer-coisa</code>, só o trecho antes de <code>:</code> será considerado.
+          </p>
+
+          <textarea
+            value={contactsRawInput}
+            onChange={(event) => setContactsRawInput(event.target.value)}
+            placeholder={"ana@email.com\nbruno@email.com:vip\ncarla@email.com:dados-extra"}
+            rows={6}
+            className="mt-4 w-full rounded-2xl border border-slate-300 px-4 py-3 text-slate-900 outline-none ring-indigo-200 transition focus:ring"
+          />
+
+          <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <p className="text-sm font-semibold text-slate-700">Total de e-mails encontrados: {emailsPreparadosParaImportacao.length}</p>
+            <button
+              type="button"
+              onClick={importarContatos}
+              disabled={isImportingContacts}
+              className="rounded-2xl bg-slate-900 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isImportingContacts ? "Importando..." : "Importar e-mails"}
+            </button>
+          </div>
+
+          {importFeedback ? <p className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-700">{importFeedback}</p> : null}
+          {importError ? <p className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-red-700">{importError}</p> : null}
+          {totalEmailsImportados !== null ? <p className="mt-3 text-xs text-slate-500">Última importação: {totalEmailsImportados} e-mail(s) processado(s).</p> : null}
+        </article>
 
         <form onSubmit={criarEEnviarCampanha} className="mt-8 space-y-4">
           <label className="block text-sm font-semibold text-slate-700" htmlFor="live-link">

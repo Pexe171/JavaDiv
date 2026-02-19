@@ -42,4 +42,9 @@ public class CampaignController {
     public MailBatchConfigResponse config() {
         return campaignService.mailBatchConfig();
     }
+
+    @PutMapping("/config")
+    public MailBatchConfigResponse updateConfig(@Valid @RequestBody UpdateMailBatchConfigRequest request) {
+        return campaignService.updateMailBatchConfig(request);
+    }
 }

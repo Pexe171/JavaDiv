@@ -4,6 +4,7 @@ import com.javadiv.mailer.config.MailBatchProperties;
 import com.javadiv.mailer.domain.*;
 import com.javadiv.mailer.dto.*;
 import com.javadiv.mailer.exception.NotFoundException;
+import com.javadiv.mailer.exception.BusinessException;
 import com.javadiv.mailer.repository.CampaignRecipientRepository;
 import com.javadiv.mailer.repository.CampaignRepository;
 import com.javadiv.mailer.repository.ContactRepository;
@@ -23,6 +24,8 @@ public class CampaignService {
     private final MailSenderService mailSenderService;
     private final UnsubscribeService unsubscribeService;
     private final MailBatchProperties mailBatchProperties;
+    private volatile int currentBatchSize;
+    private volatile int currentBatchIntervalSeconds;
 
     public CampaignService(CampaignRepository campaignRepository,
                            CampaignRecipientRepository recipientRepository,
@@ -36,6 +39,8 @@ public class CampaignService {
         this.mailSenderService = mailSenderService;
         this.unsubscribeService = unsubscribeService;
         this.mailBatchProperties = mailBatchProperties;
+        this.currentBatchSize = mailBatchProperties.batchSize();
+        this.currentBatchIntervalSeconds = mailBatchProperties.batchIntervalSeconds();
     }
 
     @Transactional
@@ -100,9 +105,25 @@ public class CampaignService {
     @Transactional(readOnly = true)
     public MailBatchConfigResponse mailBatchConfig() {
         return new MailBatchConfigResponse(
-                mailBatchProperties.batchSize(),
-                mailBatchProperties.batchIntervalSeconds()
+                currentBatchSize,
+                currentBatchIntervalSeconds
         );
+    }
+
+    @Transactional
+    public MailBatchConfigResponse updateMailBatchConfig(UpdateMailBatchConfigRequest request) {
+        if (request.mailBatchSize() < 1) {
+            throw new BusinessException("MAIL_BATCH_SIZE deve ser maior que zero.");
+        }
+
+        if (request.mailBatchIntervalSeconds() < 0) {
+            throw new BusinessException("MAIL_BATCH_INTERVAL_SECONDS não pode ser negativo.");
+        }
+
+        currentBatchSize = request.mailBatchSize();
+        currentBatchIntervalSeconds = request.mailBatchIntervalSeconds();
+
+        return mailBatchConfig();
     }
 
     private void processCampaign(Campaign campaign) {
@@ -134,7 +155,7 @@ public class CampaignService {
 
             recipientRepository.save(recipient);
             processed++;
-            if (processed % mailBatchProperties.batchSize() == 0) {
+            if (processed % currentBatchSize == 0) {
                 sleepBatchInterval();
             }
         }
@@ -145,7 +166,7 @@ public class CampaignService {
 
     private void sleepBatchInterval() {
         try {
-            Thread.sleep(mailBatchProperties.batchIntervalSeconds() * 1000L);
+            Thread.sleep(currentBatchIntervalSeconds * 1000L);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }

@@ -46,6 +46,7 @@ API para gestão e envio de campanhas de e-mail para inscritos em lives, com foc
 - `POST /api/campaigns/{id}/schedule`
 - `POST /api/campaigns/{id}/send-now`
 - `GET /api/campaigns/{id}/status`
+- `GET /api/campaigns/config`
 - `GET /api/unsubscribe/{token}`
 
 ## Configuração via `.env`
@@ -181,10 +182,16 @@ Foi adicionado o módulo web em `frontend/` com:
 
 - Next.js (App Router)
 - Tailwind CSS
-- React Hooks (`useState`, `useEffect`, `useMemo`) para estado de upload, progresso e resposta da API
-- Área drag-and-drop para ficheiro `.txt`
-- Envio do conteúdo bruto para `POST /api/contacts/import-lines` com `Content-Type: text/plain`
-- Cards de resumo visual para importados, inválidos e duplicados
+- React Hooks (`useState`, `useEffect`, `useMemo`) para estado da campanha, polling e status da API
+- Editor de conteúdo com campos de **Título**, **Assunto** e editor rich text (HTML)
+- Interface de agendamento com seletor de data/hora para envio em `POST /api/campaigns/{id}/schedule`
+- Leitura dos parâmetros de lote vindos do back-end em `GET /api/campaigns/config`
+- Painel de monitoramento em tempo real (polling de status a cada poucos segundos)
+- Barra de progresso visual com estados:
+  - Verde: enviados (`sent`)
+  - Vermelho: falhas (`failed`)
+  - Cinza animado: pendentes (`pending`)
+- Console de erros rolável com logs de falha (`errorMessage`) por destinatário
 
 #### Executar front-end
 
@@ -220,4 +227,3 @@ docker run -p 8080:8080 --name javadiv-container --network="host" javadiv-app
 ```
 
 > Se optar por execução local sem Docker, mantenha o Java 21 instalado e configurado no terminal.
-

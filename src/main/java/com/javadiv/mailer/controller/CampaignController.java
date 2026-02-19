@@ -37,4 +37,9 @@ public class CampaignController {
     public CampaignStatusResponse status(@PathVariable Long id) {
         return campaignService.status(id);
     }
+
+    @GetMapping("/config")
+    public MailBatchConfigResponse config() {
+        return campaignService.mailBatchConfig();
+    }
 }

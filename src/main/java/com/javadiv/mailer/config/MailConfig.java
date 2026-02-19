@@ -6,6 +6,8 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.JavaMailSenderImpl;
 
+import java.util.Properties;
+
 @Configuration
 public class MailConfig {
 
@@ -21,9 +23,23 @@ public class MailConfig {
             sender.setProtocol(sanitize(properties.getProtocol()));
         }
 
-        sender.setJavaMailProperties(new java.util.Properties());
-        sender.getJavaMailProperties().putAll(properties.getProperties());
+        sender.setJavaMailProperties(buildJavaMailProperties(properties));
         return sender;
+    }
+
+    private static Properties buildJavaMailProperties(MailProperties properties) {
+        Properties sanitizedProperties = new Properties();
+        sanitizedProperties.putAll(properties.getProperties());
+
+        boolean hasSslConfig = sanitizedProperties.containsKey("mail.smtp.ssl.enable");
+        boolean hasStartTlsConfig = sanitizedProperties.containsKey("mail.smtp.starttls.enable");
+
+        if (properties.getPort() == 465 && !hasSslConfig && !hasStartTlsConfig) {
+            sanitizedProperties.put("mail.smtp.ssl.enable", "true");
+            sanitizedProperties.put("mail.smtp.starttls.enable", "false");
+        }
+
+        return sanitizedProperties;
     }
 
     static String sanitize(String value) {

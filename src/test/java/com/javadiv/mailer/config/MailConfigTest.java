@@ -5,6 +5,7 @@ import org.springframework.boot.autoconfigure.mail.MailProperties;
 import org.springframework.mail.javamail.JavaMailSenderImpl;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 class MailConfigTest {
 
@@ -27,6 +28,29 @@ class MailConfigTest {
         assertEquals("senha-app", sender.getPassword());
         assertEquals("smtps", sender.getProtocol());
         assertEquals("true", sender.getJavaMailProperties().getProperty("mail.smtp.auth"));
+    }
+
+    @Test
+    void deveAtivarSslPorPadraoQuandoPortaFor465ESemTlsConfigurado() {
+        MailProperties properties = new MailProperties();
+        properties.setPort(465);
+
+        JavaMailSenderImpl sender = (JavaMailSenderImpl) mailConfig.javaMailSender(properties);
+
+        assertEquals("true", sender.getJavaMailProperties().getProperty("mail.smtp.ssl.enable"));
+        assertEquals("false", sender.getJavaMailProperties().getProperty("mail.smtp.starttls.enable"));
+    }
+
+    @Test
+    void deveRespeitarConfiguracaoExistenteDeStartTlsNaPorta465() {
+        MailProperties properties = new MailProperties();
+        properties.setPort(465);
+        properties.getProperties().put("mail.smtp.starttls.enable", "true");
+
+        JavaMailSenderImpl sender = (JavaMailSenderImpl) mailConfig.javaMailSender(properties);
+
+        assertEquals("true", sender.getJavaMailProperties().getProperty("mail.smtp.starttls.enable"));
+        assertNull(sender.getJavaMailProperties().getProperty("mail.smtp.ssl.enable"));
     }
 
     @Test

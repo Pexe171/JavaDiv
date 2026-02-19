@@ -91,6 +91,15 @@ Mesmo com essa proteção, prefira definir no `.env` sem aspas no host:
 SMTP_HOST=smtp.gmail.com
 ```
 
+Se você usar **porta 465**, o SMTP normalmente exige SSL implícito. A aplicação agora ativa automaticamente:
+
+- `mail.smtp.ssl.enable=true`
+- `mail.smtp.starttls.enable=false`
+
+quando detectar porta `465` e nenhuma dessas flags definida manualmente.
+
+Se quiser controlar manualmente TLS/SSL, basta definir `spring.mail.properties.*` nas variáveis de ambiente.
+
 ## Setup local
 
 ### 1) Banco de dados

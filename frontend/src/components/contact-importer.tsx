@@ -430,7 +430,8 @@ export function ContactImporter() {
   };
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-6 px-6 py-10">
+    <main className="relative mx-auto min-h-screen w-full max-w-6xl px-6 py-10">
+      <div className={`flex flex-col gap-6 transition ${isSendNowModalOpen ? "pointer-events-none select-none blur-[2px]" : ""}`}>
       <header className="space-y-2">
         <p className="text-sm font-semibold uppercase tracking-wide text-indigo-600">
           Gestão de campanhas
@@ -615,7 +616,7 @@ export function ContactImporter() {
             disabled={!campaign || isSubmitting}
             className="w-full rounded-xl bg-amber-500 px-5 py-3 font-semibold text-white hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {isSubmitting ? "Processando..." : "Disparar agora"}
+            {isSubmitting ? "Processando..." : "Disparar Agora"}
           </button>
 
           <p className="text-sm text-slate-500">
@@ -745,13 +746,16 @@ export function ContactImporter() {
                 </tr>
               ) : (
                 contacts.map((contact) => (
-                  <tr key={contact.id} className={contact.unsubscribedAt ? "bg-amber-50/60" : ""}>
+                  <tr
+                    key={contact.id}
+                    className={contact.unsubscribedAt ? "border-l-4 border-amber-400 bg-amber-50/80" : ""}
+                  >
                     <td className="px-4 py-3 text-slate-700">{contact.nome}</td>
                     <td className="px-4 py-3 text-slate-700">{contact.email}</td>
                     <td className="px-4 py-3">
                       {contact.unsubscribedAt ? (
                         <span className="rounded-full bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-700">
-                          Descadastrado em {new Date(contact.unsubscribedAt).toLocaleDateString("pt-BR")}
+                          Descadastrado
                         </span>
                       ) : (
                         <span className="rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-700">
@@ -766,9 +770,10 @@ export function ContactImporter() {
           </table>
         </div>
       </section>
+      </div>
 
       {isSendNowModalOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 px-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/45 px-4 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
             <h3 className="text-lg font-semibold text-slate-900">Confirmar disparo imediato</h3>
             <p className="mt-2 text-sm text-slate-600">

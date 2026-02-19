@@ -186,7 +186,7 @@ Foi adicionado o módulo web em `frontend/` com:
 - React Hooks (`useState`, `useEffect`, `useMemo`) para estado da campanha, polling e status da API
 - Editor de conteúdo com campos de **Título**, **Assunto** e editor rich text (HTML)
 - Interface de agendamento com seletor de data/hora para envio em `POST /api/campaigns/{id}/schedule`
-- Botão de **disparo imediato** integrado ao endpoint `POST /api/campaigns/{id}/send-now`, com modal de confirmação antes da execução
+- Botão de **Disparar Agora** integrado ao endpoint `POST /api/campaigns/{id}/send-now`, com modal de confirmação e fundo com efeito de desfoque (blur) para reduzir risco de clique acidental
 - Leitura dos parâmetros de lote vindos do back-end em `GET /api/campaigns/config`
 - Ajuste dinâmico dos parâmetros de lote via campos numéricos e sliders no front-end, com persistência em `PUT /api/campaigns/config`
 - Painel de monitoramento em tempo real (polling de status a cada poucos segundos)
@@ -196,7 +196,7 @@ Foi adicionado o módulo web em `frontend/` com:
   - Vermelho: falhas (`failed`)
   - Cinza animado: pendentes (`pending`)
 - Console de erros rolável com logs de falha (`errorMessage`) por destinatário
-- Tabela de **higienização visual da base** com destaque para contatos descadastrados (`unsubscribedAt` não nulo)
+- Tabela de **higienização visual da base** com faixa amarela para contatos descadastrados (`unsubscribedAt` não nulo) e status textual **Descadastrado**
 - Zona de **importação Drag & Drop** para arquivos `.txt`, leitura local com `FileReader`, envio para `POST /api/contacts/import-lines` e resumo animado de processamento (importados, inválidos e duplicados)
 
 #### Executar front-end

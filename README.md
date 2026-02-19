@@ -78,6 +78,28 @@ MAIL_BATCH_INTERVAL_SECONDS=60
 
 > Dica: use `source .env` antes de rodar a aplicação no terminal.
 
+
+### Erro comum: `UnknownHostException: "smtp.gmail.com"`
+
+Se o log mostrar o host SMTP com aspas (por exemplo `"smtp.gmail.com"`), o DNS tenta resolver o valor **com as aspas** e a conexão falha.
+
+A aplicação agora sanitiza automaticamente aspas externas nas propriedades SMTP (`host`, `username`, `password` e `protocol`) para evitar esse problema em ambientes onde variáveis chegam com aspas extras.
+
+Mesmo com essa proteção, prefira definir no `.env` sem aspas no host:
+
+```env
+SMTP_HOST=smtp.gmail.com
+```
+
+Se você usar **porta 465**, o SMTP normalmente exige SSL implícito. A aplicação agora ativa automaticamente:
+
+- `mail.smtp.ssl.enable=true`
+- `mail.smtp.starttls.enable=false`
+
+quando detectar porta `465` e nenhuma dessas flags definida manualmente.
+
+Se quiser controlar manualmente TLS/SSL, basta definir `spring.mail.properties.*` nas variáveis de ambiente.
+
 ## Setup local
 
 ### 1) Banco de dados

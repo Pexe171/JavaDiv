@@ -8,6 +8,8 @@ import com.javadiv.mailer.exception.BusinessException;
 import com.javadiv.mailer.repository.CampaignRecipientRepository;
 import com.javadiv.mailer.repository.CampaignRepository;
 import com.javadiv.mailer.repository.ContactRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.mail.MailException;
 import org.springframework.stereotype.Service;
 import org.springframework.core.task.TaskExecutor;
@@ -18,6 +20,8 @@ import java.util.List;
 
 @Service
 public class CampaignService {
+
+    private static final Logger log = LoggerFactory.getLogger(CampaignService.class);
 
     private final CampaignRepository campaignRepository;
     private final CampaignRecipientRepository recipientRepository;
@@ -148,7 +152,15 @@ public class CampaignService {
 
     private void processCampaign(Campaign campaign) {
         List<Contact> contacts = contactRepository.findByConsentimentoTrueAndUnsubscribedAtIsNullAndInscritoLivesTrue();
+        log.info("campaign_dispatch status=started campaignId={} eligibleContacts={}", campaign.getId(), contacts.size());
+
+        if (contacts.isEmpty()) {
+            log.warn("campaign_dispatch status=no_eligible_contacts campaignId={}", campaign.getId());
+        }
+
         int processed = 0;
+        int sent = 0;
+        int failed = 0;
 
         for (Contact contact : contacts) {
             if (recipientRepository.existsByCampaignIdAndContactId(campaign.getId(), contact.getId())) {
@@ -168,9 +180,25 @@ public class CampaignService {
                 recipient.setStatus(RecipientStatus.SENT);
                 recipient.setSentAt(OffsetDateTime.now());
                 recipient.setErrorMessage(null);
+                sent++;
             } catch (MailException ex) {
                 recipient.setStatus(RecipientStatus.FAILED);
                 recipient.setErrorMessage(ex.getMessage());
+                failed++;
+                log.error("campaign_dispatch status=mail_exception campaignId={} contactId={} email={} reason={}",
+                        campaign.getId(),
+                        contact.getId(),
+                        contact.getEmail(),
+                        ex.getMessage());
+            } catch (Exception ex) {
+                recipient.setStatus(RecipientStatus.FAILED);
+                recipient.setErrorMessage(ex.getMessage());
+                failed++;
+                log.error("campaign_dispatch status=unexpected_error campaignId={} contactId={} email={} reason={}",
+                        campaign.getId(),
+                        contact.getId(),
+                        contact.getEmail(),
+                        ex.getMessage());
             }
 
             recipientRepository.save(recipient);
@@ -182,6 +210,11 @@ public class CampaignService {
 
         campaign.setStatus(CampaignStatus.FINISHED);
         campaignRepository.save(campaign);
+        log.info("campaign_dispatch status=finished campaignId={} processed={} sent={} failed={}",
+                campaign.getId(),
+                processed,
+                sent,
+                failed);
     }
 
     private void sleepBatchInterval() {

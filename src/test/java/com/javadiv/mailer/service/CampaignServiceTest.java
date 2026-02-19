@@ -100,6 +100,32 @@ class CampaignServiceTest {
         verify(campaignRepository, atLeastOnce()).save(any(Campaign.class));
     }
 
+
+    @Test
+    void deveMarcarFalhaQuandoOcorrerErroInesperadoNoEnvio() {
+        Campaign campaign = new Campaign();
+        campaign.setId(3L);
+
+        Contact contatoElegivel = new Contact();
+        contatoElegivel.setId(30L);
+        contatoElegivel.setEmail("inesperado@email.com");
+
+        when(campaignRepository.findById(3L)).thenReturn(Optional.of(campaign));
+        when(contactRepository.findByConsentimentoTrueAndUnsubscribedAtIsNullAndInscritoLivesTrue())
+                .thenReturn(List.of(contatoElegivel));
+        when(recipientRepository.existsByCampaignIdAndContactId(3L, 30L)).thenReturn(false);
+        when(unsubscribeService.getOrCreateToken(30L)).thenReturn("token");
+        doThrow(new RuntimeException("erro inesperado"))
+                .when(mailSenderService).sendCampaignEmail(any(), any(), any());
+
+        campaignService.processCampaign(3L);
+
+        verify(recipientRepository, atLeast(2)).save(recipientCaptor.capture());
+        CampaignRecipient ultimo = recipientCaptor.getValue();
+        org.junit.jupiter.api.Assertions.assertEquals(RecipientStatus.FAILED, ultimo.getStatus());
+        org.junit.jupiter.api.Assertions.assertEquals("erro inesperado", ultimo.getErrorMessage());
+    }
+
     @Test
     void deveAtualizarConfiguracaoDeLoteEmMemoria() {
         MailBatchConfigResponse resposta = campaignService.updateMailBatchConfig(

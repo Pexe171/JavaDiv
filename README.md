@@ -213,8 +213,12 @@ O módulo web em `frontend/` foi simplificado para um fluxo de disparo rápido:
   - assunto padrão para chamada de live ao vivo
   - HTML de e-mail pré-pronto com botão **"Clique aqui para assistir"**
 - Disparo imediato logo após criação, usando `POST /api/campaigns` + `POST /api/campaigns/{id}/send-now`
+- Disparo imediato **assíncrono**: a API responde rápido e o processamento segue em segundo plano
 - Prévia visual do botão para validar rapidamente o link informado
 - Mensagens claras de sucesso/erro na própria tela
+- Monitoramento automático do status da campanha via `GET /api/campaigns/{id}/status`
+- Painel com totais de `SENT`, `FAILED`, `PENDING`
+- Lista dos últimos e-mails enviados com sucesso e logs de erro detalhados (e-mail + mensagem retornada)
 
 #### Executar front-end
 

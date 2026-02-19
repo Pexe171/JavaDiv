@@ -10,4 +10,5 @@ public interface CampaignRecipientRepository extends JpaRepository<CampaignRecip
     boolean existsByCampaignIdAndContactId(Long campaignId, Long contactId);
     long countByCampaignIdAndStatus(Long campaignId, RecipientStatus status);
     List<CampaignRecipient> findTop50ByCampaignIdAndStatusOrderByIdDesc(Long campaignId, RecipientStatus status);
+    List<CampaignRecipient> findTop50ByCampaignIdAndStatusAndSentAtIsNotNullOrderBySentAtDesc(Long campaignId, RecipientStatus status);
 }

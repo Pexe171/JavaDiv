@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 
 type CampaignResponse = {
   id: number;
@@ -8,6 +8,23 @@ type CampaignResponse = {
   assunto: string;
   conteudoHtml: string;
   status: string;
+};
+
+type CampaignStatusResponse = {
+  campaignId: number;
+  campaignStatus: string;
+  pending: number;
+  sent: number;
+  failed: number;
+  enviosComSucesso: Array<{
+    email: string;
+    sentAt: string | null;
+  }>;
+  erros: Array<{
+    email: string;
+    errorMessage: string;
+    sentAt: string | null;
+  }>;
 };
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
@@ -58,6 +75,64 @@ export function ContactImporter() {
   const [feedback, setFeedback] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [campaign, setCampaign] = useState<CampaignResponse | null>(null);
+  const [campaignStatus, setCampaignStatus] = useState<CampaignStatusResponse | null>(null);
+  const [isPollingStatus, setIsPollingStatus] = useState(false);
+
+  useEffect(() => {
+    if (!campaign?.id) {
+      return;
+    }
+
+    let foiCancelado = false;
+    let intervalo: ReturnType<typeof setInterval> | null = null;
+
+    const carregarStatus = async () => {
+      try {
+        const response = await fetch(`${API_URL}/api/campaigns/${campaign.id}/status`);
+        if (!response.ok) {
+          throw new Error("Não foi possível consultar o status da campanha.");
+        }
+
+        const status = (await response.json()) as CampaignStatusResponse;
+        if (foiCancelado) {
+          return;
+        }
+
+        setCampaignStatus(status);
+
+        if (status.campaignStatus === "FINISHED") {
+          setIsPollingStatus(false);
+          if (intervalo) {
+            clearInterval(intervalo);
+          }
+        }
+      } catch (statusError) {
+        if (foiCancelado) {
+          return;
+        }
+
+        setError(statusError instanceof Error ? statusError.message : "Falha ao atualizar status da campanha.");
+        setIsPollingStatus(false);
+        if (intervalo) {
+          clearInterval(intervalo);
+        }
+      }
+    };
+
+    setIsPollingStatus(true);
+    setCampaignStatus(null);
+    void carregarStatus();
+    intervalo = setInterval(() => {
+      void carregarStatus();
+    }, 2000);
+
+    return () => {
+      foiCancelado = true;
+      if (intervalo) {
+        clearInterval(intervalo);
+      }
+    };
+  }, [campaign?.id]);
 
   const emailsPreparadosParaImportacao = useMemo(() => {
     const linhas = contactsRawInput.split(/\r?\n/);
@@ -122,7 +197,7 @@ export function ContactImporter() {
         throw new Error(message || "Campanha criada, mas houve falha no disparo imediato.");
       }
 
-      setFeedback(`Campanha #${createdCampaign.id} criada e disparada com sucesso.`);
+      setFeedback(`Campanha #${createdCampaign.id} criada. Disparo iniciado e status sendo acompanhado em tempo real.`);
       setLiveLink("");
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Erro inesperado ao enviar campanha.");
@@ -242,9 +317,58 @@ export function ContactImporter() {
         {error ? <p className="mt-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-red-700">{error}</p> : null}
 
         {campaign ? (
-          <p className="mt-4 text-sm text-slate-500">
-            Última campanha enviada: #{campaign.id} ({campaign.status}).
-          </p>
+          <section className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-5">
+            <p className="text-sm font-semibold text-slate-900">Acompanhamento da campanha #{campaign.id}</p>
+            <p className="mt-2 text-sm text-slate-600">
+              Status atual: <strong>{campaignStatus?.campaignStatus ?? campaign.status}</strong>
+              {isPollingStatus ? " (atualizando automaticamente)" : ""}
+            </p>
+
+            {campaignStatus ? (
+              <div className="mt-4 grid gap-3 md:grid-cols-3">
+                <div className="rounded-xl border border-slate-200 bg-white p-3">
+                  <p className="text-xs uppercase text-slate-500">Enviados com sucesso</p>
+                  <p className="text-xl font-black text-emerald-600">{campaignStatus.sent}</p>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-white p-3">
+                  <p className="text-xs uppercase text-slate-500">Com falha</p>
+                  <p className="text-xl font-black text-red-600">{campaignStatus.failed}</p>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-white p-3">
+                  <p className="text-xs uppercase text-slate-500">Pendentes</p>
+                  <p className="text-xl font-black text-amber-600">{campaignStatus.pending}</p>
+                </div>
+              </div>
+            ) : (
+              <p className="mt-3 text-sm text-slate-500">Carregando status da campanha...</p>
+            )}
+
+            {campaignStatus?.enviosComSucesso?.length ? (
+              <div className="mt-5">
+                <p className="text-sm font-semibold text-emerald-700">Últimos e-mails enviados com sucesso</p>
+                <ul className="mt-2 space-y-1 text-sm text-slate-700">
+                  {campaignStatus.enviosComSucesso.map((registro) => (
+                    <li key={`${registro.email}-${registro.sentAt}`} className="rounded-lg bg-emerald-50 px-3 py-2">
+                      {registro.email}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+
+            {campaignStatus?.erros?.length ? (
+              <div className="mt-5">
+                <p className="text-sm font-semibold text-red-700">Erros de envio (log do back-end)</p>
+                <ul className="mt-2 space-y-1 text-sm text-slate-700">
+                  {campaignStatus.erros.map((erro) => (
+                    <li key={`${erro.email}-${erro.sentAt}`} className="rounded-lg bg-red-50 px-3 py-2">
+                      <strong>{erro.email}</strong>: {erro.errorMessage || "Erro sem detalhe"}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </section>
         ) : null}
       </section>
     </main>

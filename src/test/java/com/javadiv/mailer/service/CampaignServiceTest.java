@@ -2,6 +2,9 @@ package com.javadiv.mailer.service;
 
 import com.javadiv.mailer.config.MailBatchProperties;
 import com.javadiv.mailer.domain.*;
+import com.javadiv.mailer.dto.MailBatchConfigResponse;
+import com.javadiv.mailer.dto.UpdateMailBatchConfigRequest;
+import com.javadiv.mailer.exception.BusinessException;
 import com.javadiv.mailer.repository.CampaignRecipientRepository;
 import com.javadiv.mailer.repository.CampaignRepository;
 import com.javadiv.mailer.repository.ContactRepository;
@@ -16,6 +19,8 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -93,5 +98,29 @@ class CampaignServiceTest {
         CampaignRecipient ultimo = recipientCaptor.getValue();
         org.junit.jupiter.api.Assertions.assertEquals(RecipientStatus.FAILED, ultimo.getStatus());
         verify(campaignRepository, atLeastOnce()).save(any(Campaign.class));
+    }
+
+    @Test
+    void deveAtualizarConfiguracaoDeLoteEmMemoria() {
+        MailBatchConfigResponse resposta = campaignService.updateMailBatchConfig(
+                new UpdateMailBatchConfigRequest(25, 12)
+        );
+
+        assertEquals(25, resposta.mailBatchSize());
+        assertEquals(12, resposta.mailBatchIntervalSeconds());
+        assertEquals(25, campaignService.mailBatchConfig().mailBatchSize());
+        assertEquals(12, campaignService.mailBatchConfig().mailBatchIntervalSeconds());
+    }
+
+    @Test
+    void deveValidarConfiguracaoDeLoteInvalida() {
+        assertThrows(
+                BusinessException.class,
+                () -> campaignService.updateMailBatchConfig(new UpdateMailBatchConfigRequest(0, 10))
+        );
+        assertThrows(
+                BusinessException.class,
+                () -> campaignService.updateMailBatchConfig(new UpdateMailBatchConfigRequest(10, -1))
+        );
     }
 }

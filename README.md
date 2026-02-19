@@ -47,6 +47,7 @@ API para gestão e envio de campanhas de e-mail para inscritos em lives, com foc
 - `POST /api/campaigns/{id}/send-now`
 - `GET /api/campaigns/{id}/status`
 - `GET /api/campaigns/config`
+- `PUT /api/campaigns/config`
 - `GET /api/unsubscribe/{token}`
 
 ## Configuração via `.env`
@@ -187,6 +188,7 @@ Foi adicionado o módulo web em `frontend/` com:
 - Interface de agendamento com seletor de data/hora para envio em `POST /api/campaigns/{id}/schedule`
 - Botão de **disparo imediato** integrado ao endpoint `POST /api/campaigns/{id}/send-now`, com modal de confirmação antes da execução
 - Leitura dos parâmetros de lote vindos do back-end em `GET /api/campaigns/config`
+- Ajuste dinâmico dos parâmetros de lote via campos numéricos e sliders no front-end, com persistência em `PUT /api/campaigns/config`
 - Painel de monitoramento em tempo real (polling de status a cada poucos segundos)
 - Painel de **ciclo de vida da campanha** com etapas visuais (criação, programação, disparo e finalização)
 - Barra de progresso visual com estados:

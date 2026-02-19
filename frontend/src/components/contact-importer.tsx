@@ -67,6 +67,8 @@ export function ContactImporter() {
   const [scheduledAt, setScheduledAt] = useState("");
   const [mailBatchSize, setMailBatchSize] = useState<number>(0);
   const [mailBatchIntervalSeconds, setMailBatchIntervalSeconds] = useState<number>(0);
+  const [isSavingBatchConfig, setIsSavingBatchConfig] = useState(false);
+  const [batchConfigDirty, setBatchConfigDirty] = useState(false);
 
   const [campaign, setCampaign] = useState<CampaignResponse | null>(null);
   const [status, setStatus] = useState<CampaignStatusResponse | null>(null);
@@ -179,6 +181,51 @@ export function ContactImporter() {
   const executeCommand = (command: string) => {
     document.execCommand(command, false);
     setConteudoHtml(editorRef.current?.innerHTML ?? "");
+  };
+
+  const adicionarLink = () => {
+    const link = window.prompt("Informe a URL para o link (ex.: https://seusite.com)");
+    if (!link) {
+      return;
+    }
+
+    document.execCommand("createLink", false, link);
+    setConteudoHtml(editorRef.current?.innerHTML ?? "");
+  };
+
+  const salvarConfiguracaoLote = async () => {
+    setIsSavingBatchConfig(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`${API_URL}/api/campaigns/config`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mailBatchSize,
+          mailBatchIntervalSeconds,
+        }),
+      });
+
+      if (!response.ok) {
+        const message = await response.text();
+        throw new Error(message || "Falha ao salvar configuração de lotes.");
+      }
+
+      const payload = (await response.json()) as MailBatchConfigResponse;
+      setMailBatchSize(payload.mailBatchSize);
+      setMailBatchIntervalSeconds(payload.mailBatchIntervalSeconds);
+      setBatchConfigDirty(false);
+      setFeedback("Configuração de lotes atualizada com sucesso.");
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Erro inesperado ao salvar configuração de lotes.",
+      );
+    } finally {
+      setIsSavingBatchConfig(false);
+    }
   };
 
   const dispararCampanhaAgora = async () => {
@@ -448,6 +495,7 @@ export function ContactImporter() {
               <button type="button" onClick={() => executeCommand("bold")} className="rounded-lg border px-3 py-1 text-sm">Negrito</button>
               <button type="button" onClick={() => executeCommand("italic")} className="rounded-lg border px-3 py-1 text-sm">Itálico</button>
               <button type="button" onClick={() => executeCommand("insertUnorderedList")} className="rounded-lg border px-3 py-1 text-sm">Lista</button>
+              <button type="button" onClick={adicionarLink} className="rounded-lg border px-3 py-1 text-sm">Link</button>
             </div>
             <div
               ref={editorRef}
@@ -475,8 +523,12 @@ export function ContactImporter() {
               <input
                 type="number"
                 value={mailBatchSize}
-                readOnly
-                className="w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2"
+                min={1}
+                onChange={(event) => {
+                  setMailBatchSize(Number(event.target.value));
+                  setBatchConfigDirty(true);
+                }}
+                className="w-full rounded-xl border border-slate-300 px-3 py-2"
               />
             </div>
             <div>
@@ -484,11 +536,59 @@ export function ContactImporter() {
               <input
                 type="number"
                 value={mailBatchIntervalSeconds}
-                readOnly
-                className="w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2"
+                min={0}
+                onChange={(event) => {
+                  setMailBatchIntervalSeconds(Number(event.target.value));
+                  setBatchConfigDirty(true);
+                }}
+                className="w-full rounded-xl border border-slate-300 px-3 py-2"
               />
             </div>
           </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Lote por envio
+              </label>
+              <input
+                type="range"
+                min={1}
+                max={500}
+                value={mailBatchSize}
+                onChange={(event) => {
+                  setMailBatchSize(Number(event.target.value));
+                  setBatchConfigDirty(true);
+                }}
+                className="w-full"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Intervalo entre lotes (segundos)
+              </label>
+              <input
+                type="range"
+                min={0}
+                max={120}
+                value={mailBatchIntervalSeconds}
+                onChange={(event) => {
+                  setMailBatchIntervalSeconds(Number(event.target.value));
+                  setBatchConfigDirty(true);
+                }}
+                className="w-full"
+              />
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={salvarConfiguracaoLote}
+            disabled={isSavingBatchConfig || !batchConfigDirty}
+            className="rounded-xl border border-indigo-300 px-5 py-3 font-semibold text-indigo-700 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isSavingBatchConfig ? "Salvando configuração..." : "Aplicar configuração de lote"}
+          </button>
 
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Data e hora do envio</label>

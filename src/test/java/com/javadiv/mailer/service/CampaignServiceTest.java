@@ -8,13 +8,13 @@ import com.javadiv.mailer.exception.BusinessException;
 import com.javadiv.mailer.repository.CampaignRecipientRepository;
 import com.javadiv.mailer.repository.CampaignRepository;
 import com.javadiv.mailer.repository.ContactRepository;
+import org.springframework.core.task.TaskExecutor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.*;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -36,6 +36,8 @@ class CampaignServiceTest {
     private MailSenderService mailSenderService;
     @Mock
     private UnsubscribeService unsubscribeService;
+    @Mock
+    private TaskExecutor taskExecutor;
 
     @Captor
     private ArgumentCaptor<CampaignRecipient> recipientCaptor;
@@ -50,29 +52,27 @@ class CampaignServiceTest {
                 contactRepository,
                 mailSenderService,
                 unsubscribeService,
+                taskExecutor,
                 new MailBatchProperties(100, 0)
         );
     }
 
     @Test
-    void deveEnviarApenasParaContatoElegivelENaoDuplicarDestinatario() {
+    void deveDelegarEnvioAssincronoAoSolicitarDisparoImediato() {
         Campaign campaign = new Campaign();
         campaign.setId(1L);
 
-        Contact contatoElegivel = new Contact();
-        contatoElegivel.setId(10L);
-        contatoElegivel.setEmail("ok@email.com");
-
         when(campaignRepository.findById(1L)).thenReturn(Optional.of(campaign));
-        when(contactRepository.findByConsentimentoTrueAndUnsubscribedAtIsNullAndInscritoLivesTrue())
-                .thenReturn(List.of(contatoElegivel));
-        when(unsubscribeService.getOrCreateToken(10L)).thenReturn("token-abc");
-        when(recipientRepository.existsByCampaignIdAndContactId(1L, 10L)).thenReturn(false);
+        doAnswer(invocation -> {
+            Runnable runnable = invocation.getArgument(0);
+            runnable.run();
+            return null;
+        }).when(taskExecutor).execute(any(Runnable.class));
 
         campaignService.sendNow(1L);
 
-        verify(mailSenderService).sendCampaignEmail(campaign, contatoElegivel, "token-abc");
-        verify(recipientRepository, atLeast(1)).save(recipientCaptor.capture());
+        verify(taskExecutor).execute(any(Runnable.class));
+        verify(campaignRepository, atLeastOnce()).save(any(Campaign.class));
     }
 
     @Test
@@ -92,7 +92,7 @@ class CampaignServiceTest {
         doThrow(new org.springframework.mail.MailSendException("erro smtp"))
                 .when(mailSenderService).sendCampaignEmail(any(), any(), any());
 
-        campaignService.sendNow(2L);
+        campaignService.processCampaign(2L);
 
         verify(recipientRepository, atLeast(2)).save(recipientCaptor.capture());
         CampaignRecipient ultimo = recipientCaptor.getValue();

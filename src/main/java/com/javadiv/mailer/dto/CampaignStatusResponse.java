@@ -10,5 +10,6 @@ public record CampaignStatusResponse(
         long pending,
         long sent,
         long failed,
+        List<CampaignSuccessLogResponse> enviosComSucesso,
         List<CampaignErrorLogResponse> erros
 ) {}

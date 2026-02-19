@@ -10,6 +10,7 @@ import com.javadiv.mailer.repository.CampaignRepository;
 import com.javadiv.mailer.repository.ContactRepository;
 import org.springframework.mail.MailException;
 import org.springframework.stereotype.Service;
+import org.springframework.core.task.TaskExecutor;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
@@ -23,6 +24,7 @@ public class CampaignService {
     private final ContactRepository contactRepository;
     private final MailSenderService mailSenderService;
     private final UnsubscribeService unsubscribeService;
+    private final TaskExecutor taskExecutor;
     private final MailBatchProperties mailBatchProperties;
     private volatile int currentBatchSize;
     private volatile int currentBatchIntervalSeconds;
@@ -32,12 +34,14 @@ public class CampaignService {
                            ContactRepository contactRepository,
                            MailSenderService mailSenderService,
                            UnsubscribeService unsubscribeService,
+                           TaskExecutor taskExecutor,
                            MailBatchProperties mailBatchProperties) {
         this.campaignRepository = campaignRepository;
         this.recipientRepository = recipientRepository;
         this.contactRepository = contactRepository;
         this.mailSenderService = mailSenderService;
         this.unsubscribeService = unsubscribeService;
+        this.taskExecutor = taskExecutor;
         this.mailBatchProperties = mailBatchProperties;
         this.currentBatchSize = mailBatchProperties.batchSize();
         this.currentBatchIntervalSeconds = mailBatchProperties.batchIntervalSeconds();
@@ -66,7 +70,7 @@ public class CampaignService {
         Campaign campaign = getCampaign(id);
         campaign.setStatus(CampaignStatus.SENDING);
         campaignRepository.save(campaign);
-        processCampaign(campaign);
+        taskExecutor.execute(() -> processCampaign(campaign.getId()));
     }
 
     @Transactional
@@ -75,8 +79,14 @@ public class CampaignService {
         dueCampaigns.forEach(campaign -> {
             campaign.setStatus(CampaignStatus.SENDING);
             campaignRepository.save(campaign);
-            processCampaign(campaign);
+            taskExecutor.execute(() -> processCampaign(campaign.getId()));
         });
+    }
+
+    @Transactional
+    public void processCampaign(Long campaignId) {
+        Campaign campaign = getCampaign(campaignId);
+        processCampaign(campaign);
     }
 
     @Transactional(readOnly = true)
@@ -92,12 +102,22 @@ public class CampaignService {
                 ))
                 .toList();
 
+        List<CampaignSuccessLogResponse> enviosComSucesso = recipientRepository
+                .findTop50ByCampaignIdAndStatusAndSentAtIsNotNullOrderBySentAtDesc(id, RecipientStatus.SENT)
+                .stream()
+                .map(recipient -> new CampaignSuccessLogResponse(
+                        recipient.getContact().getEmail(),
+                        recipient.getSentAt()
+                ))
+                .toList();
+
         return new CampaignStatusResponse(
                 campaign.getId(),
                 campaign.getStatus(),
                 recipientRepository.countByCampaignIdAndStatus(id, RecipientStatus.PENDING),
                 recipientRepository.countByCampaignIdAndStatus(id, RecipientStatus.SENT),
                 recipientRepository.countByCampaignIdAndStatus(id, RecipientStatus.FAILED),
+                enviosComSucesso,
                 erros
         );
     }

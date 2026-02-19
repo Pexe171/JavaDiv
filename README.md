@@ -165,3 +165,23 @@ Inclui testes de serviços para regras críticas:
 ---
 
 Projeto preparado para evolução com filas (RabbitMQ/SQS) sem quebrar a camada de API.
+
+
+## Execução com Docker
+
+Antes de subir a aplicação, garanta que o container do banco (`pg-lives`) esteja em execução.
+
+### Build da imagem
+
+```bash
+docker build -t javadiv-app .
+```
+
+### Subir o container da aplicação
+
+```bash
+docker run -p 8080:8080 --name javadiv-container --network="host" javadiv-app
+```
+
+> Se optar por execução local sem Docker, mantenha o Java 21 instalado e configurado no terminal.
+

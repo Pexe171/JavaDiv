@@ -195,6 +195,7 @@ Foi adicionado o módulo web em `frontend/` com:
   - Cinza animado: pendentes (`pending`)
 - Console de erros rolável com logs de falha (`errorMessage`) por destinatário
 - Tabela de **higienização visual da base** com destaque para contatos descadastrados (`unsubscribedAt` não nulo)
+- Zona de **importação Drag & Drop** para arquivos `.txt`, leitura local com `FileReader`, envio para `POST /api/contacts/import-lines` e resumo animado de processamento (importados, inválidos e duplicados)
 
 #### Executar front-end
 

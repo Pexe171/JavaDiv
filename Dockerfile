@@ -1,5 +1,12 @@
-FROM eclipse-temurin:21-jdk-alpine
+# Estágio de Compilação
+FROM maven:3.9.6-eclipse-temurin-21-alpine AS build
 WORKDIR /app
 COPY . .
-RUN ./mvnw install -DskipTests
-CMD ["./mvnw", "spring-boot:run"]
+RUN mvn clean install -DskipTests
+
+# Estágio de Execução
+FROM eclipse-temurin:21-jdk-alpine
+WORKDIR /app
+COPY --from=build /app/target/*.jar app.jar
+EXPOSE 8080
+ENTRYPOINT ["java", "-jar", "app.jar"]

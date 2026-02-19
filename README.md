@@ -185,13 +185,16 @@ Foi adicionado o módulo web em `frontend/` com:
 - React Hooks (`useState`, `useEffect`, `useMemo`) para estado da campanha, polling e status da API
 - Editor de conteúdo com campos de **Título**, **Assunto** e editor rich text (HTML)
 - Interface de agendamento com seletor de data/hora para envio em `POST /api/campaigns/{id}/schedule`
+- Botão de **disparo imediato** integrado ao endpoint `POST /api/campaigns/{id}/send-now`, com modal de confirmação antes da execução
 - Leitura dos parâmetros de lote vindos do back-end em `GET /api/campaigns/config`
 - Painel de monitoramento em tempo real (polling de status a cada poucos segundos)
+- Painel de **ciclo de vida da campanha** com etapas visuais (criação, programação, disparo e finalização)
 - Barra de progresso visual com estados:
   - Verde: enviados (`sent`)
   - Vermelho: falhas (`failed`)
   - Cinza animado: pendentes (`pending`)
 - Console de erros rolável com logs de falha (`errorMessage`) por destinatário
+- Tabela de **higienização visual da base** com destaque para contatos descadastrados (`unsubscribedAt` não nulo)
 
 #### Executar front-end
 

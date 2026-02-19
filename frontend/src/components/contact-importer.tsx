@@ -32,6 +32,22 @@ type MailBatchConfigResponse = {
   mailBatchIntervalSeconds: number;
 };
 
+type ContactResponse = {
+  id: number;
+  nome: string;
+  email: string;
+  consentimento: boolean;
+  inscritoLives: boolean;
+  unsubscribedAt: string | null;
+  createdAt: string;
+};
+
+type CampaignLifecycleStep = {
+  title: string;
+  description: string;
+  done: boolean;
+};
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 const POLLING_INTERVAL = 4000;
 
@@ -47,9 +63,11 @@ export function ContactImporter() {
 
   const [campaign, setCampaign] = useState<CampaignResponse | null>(null);
   const [status, setStatus] = useState<CampaignStatusResponse | null>(null);
+  const [contacts, setContacts] = useState<ContactResponse[]>([]);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSendNowModalOpen, setIsSendNowModalOpen] = useState(false);
 
   useEffect(() => {
     if (editorRef.current && editorRef.current.innerHTML !== conteudoHtml) {
@@ -78,6 +96,28 @@ export function ContactImporter() {
     };
 
     loadConfig();
+  }, []);
+
+  useEffect(() => {
+    const loadContacts = async () => {
+      try {
+        const response = await fetch(`${API_URL}/api/contacts`);
+        if (!response.ok) {
+          throw new Error("Não foi possível carregar os contatos.");
+        }
+
+        const payload = (await response.json()) as ContactResponse[];
+        setContacts(payload);
+      } catch (requestError) {
+        setError(
+          requestError instanceof Error
+            ? requestError.message
+            : "Erro inesperado ao carregar contatos.",
+        );
+      }
+    };
+
+    loadContacts();
   }, []);
 
   useEffect(() => {
@@ -130,6 +170,72 @@ export function ContactImporter() {
     document.execCommand(command, false);
     setConteudoHtml(editorRef.current?.innerHTML ?? "");
   };
+
+  const dispararCampanhaAgora = async () => {
+    if (!campaign?.id) {
+      setError("Crie uma campanha antes de disparar envio imediato.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError(null);
+    setFeedback(null);
+
+    try {
+      const response = await fetch(`${API_URL}/api/campaigns/${campaign.id}/send-now`, {
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        const message = await response.text();
+        throw new Error(message || "Falha ao disparar campanha imediatamente.");
+      }
+
+      setFeedback(`Disparo imediato da campanha #${campaign.id} iniciado com sucesso.`);
+      setIsSendNowModalOpen(false);
+      await fetchCampaignStatus(campaign.id);
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Erro inesperado ao disparar campanha.",
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const lifecycleSteps = useMemo<CampaignLifecycleStep[]>(() => {
+    const normalizedStatus = status?.campaignStatus ?? campaign?.status ?? "DRAFT";
+    const totalProcessed = (status?.sent ?? 0) + (status?.failed ?? 0);
+    const hasRecipients = (status?.pending ?? 0) + totalProcessed > 0;
+
+    return [
+      {
+        title: "1. Campanha criada",
+        description: "Conteúdo preparado e salvo para iniciar a jornada.",
+        done: Boolean(campaign?.id),
+      },
+      {
+        title: "2. Programação definida",
+        description: "Campanha agendada em data futura ou marcada para envio manual.",
+        done: normalizedStatus !== "DRAFT",
+      },
+      {
+        title: "3. Disparo em execução",
+        description: "Lotes sendo processados e tentativas registradas por destinatário.",
+        done: normalizedStatus === "SENDING" || normalizedStatus === "SENT" || hasRecipients,
+      },
+      {
+        title: "4. Ciclo finalizado",
+        description: "Processamento concluído com totais de envio e falha consolidados.",
+        done: normalizedStatus === "SENT" && (status?.pending ?? 0) === 0,
+      },
+    ];
+  }, [campaign?.id, campaign?.status, status]);
+
+  const contatosAtivos = contacts.filter((contact) => !contact.unsubscribedAt).length;
+  const contatosDescadastrados = contacts.length - contatosAtivos;
 
   const criarCampanha = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -209,6 +315,28 @@ export function ContactImporter() {
           Configure o conteúdo, agende envio e acompanhe o progresso em tempo real dos disparos.
         </p>
       </header>
+
+      <section className="rounded-2xl border border-indigo-100 bg-indigo-50/60 p-6 shadow-sm">
+        <h2 className="text-lg font-semibold text-indigo-900">Ciclo de vida da campanha</h2>
+        <p className="mt-1 text-sm text-indigo-800">
+          Acompanhe em qual etapa sua campanha está para decidir entre agendar ou disparar imediatamente.
+        </p>
+
+        <div className="mt-4 grid gap-3 md:grid-cols-2">
+          {lifecycleSteps.map((step) => (
+            <article
+              key={step.title}
+              className={`rounded-xl border p-4 ${step.done ? "border-emerald-200 bg-emerald-50" : "border-slate-200 bg-white"}`}
+            >
+              <p className="text-sm font-semibold text-slate-900">{step.title}</p>
+              <p className="mt-1 text-sm text-slate-600">{step.description}</p>
+              <p className={`mt-2 text-xs font-semibold uppercase ${step.done ? "text-emerald-700" : "text-slate-500"}`}>
+                {step.done ? "Concluída" : "Pendente"}
+              </p>
+            </article>
+          ))}
+        </div>
+      </section>
 
       <section className="grid gap-6 lg:grid-cols-2">
         <form onSubmit={criarCampanha} className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -303,6 +431,15 @@ export function ContactImporter() {
             {isSubmitting ? "Processando..." : "Agendar campanha"}
           </button>
 
+          <button
+            type="button"
+            onClick={() => setIsSendNowModalOpen(true)}
+            disabled={!campaign || isSubmitting}
+            className="w-full rounded-xl bg-amber-500 px-5 py-3 font-semibold text-white hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isSubmitting ? "Processando..." : "Disparar agora"}
+          </button>
+
           <p className="text-sm text-slate-500">
             Status da campanha: <strong>{status?.campaignStatus ?? campaign?.status ?? "-"}</strong>
           </p>
@@ -344,6 +481,86 @@ export function ContactImporter() {
           </div>
         </div>
       </section>
+
+      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h2 className="text-lg font-semibold text-slate-900">Higienização visual da base</h2>
+        <p className="mt-1 text-sm text-slate-600">
+          Contatos descadastrados ficam marcados para facilitar revisão e limpeza da sua operação.
+        </p>
+
+        <div className="mt-4 grid gap-3 md:grid-cols-2">
+          <StatusCard label="Contatos ativos" value={contatosAtivos} className="text-emerald-600" />
+          <StatusCard label="Descadastrados" value={contatosDescadastrados} className="text-amber-600" />
+        </div>
+
+        <div className="mt-4 max-h-80 overflow-y-auto rounded-xl border border-slate-200">
+          <table className="min-w-full divide-y divide-slate-200 text-sm">
+            <thead className="bg-slate-50">
+              <tr>
+                <th className="px-4 py-3 text-left font-semibold text-slate-700">Nome</th>
+                <th className="px-4 py-3 text-left font-semibold text-slate-700">E-mail</th>
+                <th className="px-4 py-3 text-left font-semibold text-slate-700">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 bg-white">
+              {!contacts.length ? (
+                <tr>
+                  <td colSpan={3} className="px-4 py-6 text-center text-slate-500">
+                    Nenhum contato cadastrado até o momento.
+                  </td>
+                </tr>
+              ) : (
+                contacts.map((contact) => (
+                  <tr key={contact.id} className={contact.unsubscribedAt ? "bg-amber-50/60" : ""}>
+                    <td className="px-4 py-3 text-slate-700">{contact.nome}</td>
+                    <td className="px-4 py-3 text-slate-700">{contact.email}</td>
+                    <td className="px-4 py-3">
+                      {contact.unsubscribedAt ? (
+                        <span className="rounded-full bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-700">
+                          Descadastrado em {new Date(contact.unsubscribedAt).toLocaleDateString("pt-BR")}
+                        </span>
+                      ) : (
+                        <span className="rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-700">
+                          Ativo
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {isSendNowModalOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 px-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+            <h3 className="text-lg font-semibold text-slate-900">Confirmar disparo imediato</h3>
+            <p className="mt-2 text-sm text-slate-600">
+              Esse processo inicia o envio da campanha agora e ignora o horário agendado. Deseja continuar?
+            </p>
+
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setIsSendNowModalOpen(false)}
+                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={dispararCampanhaAgora}
+                disabled={isSubmitting}
+                className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-600 disabled:opacity-60"
+              >
+                {isSubmitting ? "Enviando..." : "Confirmar disparo"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }

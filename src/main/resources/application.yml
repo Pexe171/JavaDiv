@@ -1,0 +1,38 @@
+server:
+  port: ${APP_PORT:8080}
+
+spring:
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:lives_mailer}
+    username: ${DB_USER:postgres}
+    password: ${DB_PASS:postgres}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: true
+    open-in-view: false
+  mail:
+    host: ${SMTP_HOST}
+    port: ${SMTP_PORT:587}
+    username: ${SMTP_USER}
+    password: ${SMTP_PASS}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
+app:
+  mail:
+    from: ${SMTP_FROM}
+    batch-size: ${MAIL_BATCH_SIZE:50}
+    batch-interval-seconds: ${MAIL_BATCH_INTERVAL_SECONDS:60}
+  scheduler:
+    fixed-delay-ms: 30000
+
+logging:
+  level:
+    com.javadiv.mailer: INFO

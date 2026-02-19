@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type CampaignResponse = {
   id: number;
@@ -42,6 +42,13 @@ type ContactResponse = {
   createdAt: string;
 };
 
+type ImportContactsResponse = {
+  totalLinhas: number;
+  importados: number;
+  ignoradosInvalidos: number;
+  ignoradosDuplicados: number;
+};
+
 type CampaignLifecycleStep = {
   title: string;
   description: string;
@@ -68,6 +75,9 @@ export function ContactImporter() {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSendNowModalOpen, setIsSendNowModalOpen] = useState(false);
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
+  const [isImportingContacts, setIsImportingContacts] = useState(false);
+  const [importSummary, setImportSummary] = useState<ImportContactsResponse | null>(null);
 
   useEffect(() => {
     if (editorRef.current && editorRef.current.innerHTML !== conteudoHtml) {
@@ -98,27 +108,27 @@ export function ContactImporter() {
     loadConfig();
   }, []);
 
-  useEffect(() => {
-    const loadContacts = async () => {
-      try {
-        const response = await fetch(`${API_URL}/api/contacts`);
-        if (!response.ok) {
-          throw new Error("Não foi possível carregar os contatos.");
-        }
-
-        const payload = (await response.json()) as ContactResponse[];
-        setContacts(payload);
-      } catch (requestError) {
-        setError(
-          requestError instanceof Error
-            ? requestError.message
-            : "Erro inesperado ao carregar contatos.",
-        );
+  const loadContacts = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_URL}/api/contacts`);
+      if (!response.ok) {
+        throw new Error("Não foi possível carregar os contatos.");
       }
-    };
 
-    loadContacts();
+      const payload = (await response.json()) as ContactResponse[];
+      setContacts(payload);
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Erro inesperado ao carregar contatos.",
+      );
+    }
   }, []);
+
+  useEffect(() => {
+    loadContacts();
+  }, [loadContacts]);
 
   useEffect(() => {
     if (!campaign?.id) {
@@ -266,6 +276,74 @@ export function ContactImporter() {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const importarContatosPorLinhas = async (linhasEmails: string) => {
+    setIsImportingContacts(true);
+    setError(null);
+    setFeedback(null);
+    setImportSummary(null);
+
+    try {
+      const response = await fetch(`${API_URL}/api/contacts/import-lines`, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain" },
+        body: linhasEmails,
+      });
+
+      if (!response.ok) {
+        const message = await response.text();
+        throw new Error(message || "Falha ao importar arquivo de e-mails.");
+      }
+
+      const payload = (await response.json()) as ImportContactsResponse;
+      setImportSummary(payload);
+      setFeedback("Importação concluída com sucesso.");
+      await loadContacts();
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Erro inesperado ao importar contatos.",
+      );
+    } finally {
+      setIsImportingContacts(false);
+    }
+  };
+
+  const processarArquivo = (file: File) => {
+    if (file.type !== "text/plain" && !file.name.endsWith(".txt")) {
+      setError("Selecione um arquivo .txt válido para importação.");
+      return;
+    }
+
+    const fileReader = new FileReader();
+    fileReader.onload = async (event) => {
+      const rawText = event.target?.result;
+      if (typeof rawText !== "string") {
+        setError("Não foi possível ler o conteúdo do arquivo selecionado.");
+        return;
+      }
+
+      const normalizedLines = rawText
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .join("\n");
+
+      if (!normalizedLines) {
+        setError("O arquivo está vazio. Informe pelo menos um e-mail por linha.");
+        return;
+      }
+
+      await importarContatosPorLinhas(normalizedLines);
+    };
+
+    fileReader.onerror = () => {
+      setError("Erro ao processar o arquivo. Tente novamente.");
+    };
+
+    fileReader.readAsText(file, "utf-8");
   };
 
   const agendarCampanha = async () => {
@@ -448,6 +526,62 @@ export function ContactImporter() {
 
       {feedback ? <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-700">{feedback}</p> : null}
       {error ? <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-red-700">{error}</p> : null}
+
+      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h2 className="text-lg font-semibold text-slate-900">Importação de contatos (.txt)</h2>
+        <p className="mt-1 text-sm text-slate-600">
+          Arraste e solte um arquivo com um e-mail por linha para enviar diretamente ao endpoint de importação.
+        </p>
+
+        <div
+          onDragOver={(event) => {
+            event.preventDefault();
+            setIsDraggingFile(true);
+          }}
+          onDragLeave={() => setIsDraggingFile(false)}
+          onDrop={(event) => {
+            event.preventDefault();
+            setIsDraggingFile(false);
+
+            const file = event.dataTransfer.files[0];
+            if (file) {
+              processarArquivo(file);
+            }
+          }}
+          className={`mt-4 rounded-2xl border-2 border-dashed p-8 text-center transition ${isDraggingFile ? "border-indigo-500 bg-indigo-50" : "border-slate-300 bg-slate-50"}`}
+        >
+          <p className="text-base font-semibold text-slate-800">
+            {isImportingContacts ? "Importando arquivo..." : "Arraste seu arquivo .txt aqui"}
+          </p>
+          <p className="mt-2 text-sm text-slate-600">ou selecione manualmente no botão abaixo.</p>
+
+          <label className="mt-4 inline-flex cursor-pointer rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700">
+            Selecionar arquivo
+            <input
+              type="file"
+              accept=".txt,text/plain"
+              className="hidden"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) {
+                  processarArquivo(file);
+                }
+                event.currentTarget.value = "";
+              }}
+            />
+          </label>
+        </div>
+
+        {importSummary ? (
+          <article className="mt-4 animate-pulse rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-800">
+            <p className="text-sm font-semibold">Resumo da importação</p>
+            <p className="mt-1 text-sm">
+              {importSummary.totalLinhas} e-mails processados: {importSummary.importados} importados ✅, {" "}
+              {importSummary.ignoradosInvalidos} inválidos ❌, {importSummary.ignoradosDuplicados} duplicados 🔁.
+            </p>
+          </article>
+        ) : null}
+      </section>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <h2 className="text-lg font-semibold text-slate-900">Painel de monitoramento e progresso</h2>

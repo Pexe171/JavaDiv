@@ -219,6 +219,7 @@ O módulo web em `frontend/` foi simplificado para um fluxo de disparo rápido:
 - Monitoramento automático do status da campanha via `GET /api/campaigns/{id}/status`
 - Painel com totais de `SENT`, `FAILED`, `PENDING`
 - Lista dos últimos e-mails enviados com sucesso e logs de erro detalhados (e-mail + mensagem retornada)
+- Aviso visual quando a campanha termina com `0` envios e `0` falhas (cenário típico de base sem contatos elegíveis)
 
 #### Executar front-end
 
@@ -254,3 +255,37 @@ docker run -p 8080:8080 --name javadiv-container --network="host" javadiv-app
 ```
 
 > Se optar por execução local sem Docker, mantenha o Java 21 instalado e configurado no terminal.
+
+
+## Diagnóstico rápido: "campanha disparada com sucesso", mas e-mail não chega
+
+Se a campanha foi iniciada, porém você não recebeu e-mail e não viu erro claro, valide nesta ordem:
+
+1. **Status da campanha**
+   - Consulte `GET /api/campaigns/{id}/status`.
+   - Se retornar `sent=0`, `failed=0` e `pending=0`, a campanha finalizou sem destinatários elegíveis.
+
+2. **Elegibilidade dos contatos**
+   - O disparo só considera contatos com:
+     - `consentimento=true`
+     - `inscritoLives=true`
+     - `unsubscribedAt=null`
+
+3. **Logs de processamento (back-end)**
+   - Agora o serviço registra logs estruturados de início e fim do disparo, incluindo total elegível e resumo final.
+   - Em falhas de envio, também registra `campaignId`, `contactId`, `email` e motivo.
+
+Exemplo de logs esperados:
+
+```text
+campaign_dispatch status=started campaignId=12 eligibleContacts=150
+campaign_dispatch status=finished campaignId=12 processed=150 sent=148 failed=2
+```
+
+Exemplo quando não há base elegível:
+
+```text
+campaign_dispatch status=started campaignId=13 eligibleContacts=0
+campaign_dispatch status=no_eligible_contacts campaignId=13
+campaign_dispatch status=finished campaignId=13 processed=0 sent=0 failed=0
+```

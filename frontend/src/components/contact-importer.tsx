@@ -325,7 +325,14 @@ export function ContactImporter() {
             </p>
 
             {campaignStatus ? (
-              <div className="mt-4 grid gap-3 md:grid-cols-3">
+              <>
+                {campaignStatus.campaignStatus === "FINISHED" && campaignStatus.sent === 0 && campaignStatus.failed === 0 ? (
+                  <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                    Campanha finalizada sem envios. Isso normalmente indica que não há contatos elegíveis (consentimento ativo, inscrito em lives e sem descadastro).
+                  </p>
+                ) : null}
+
+                <div className="mt-4 grid gap-3 md:grid-cols-3">
                 <div className="rounded-xl border border-slate-200 bg-white p-3">
                   <p className="text-xs uppercase text-slate-500">Enviados com sucesso</p>
                   <p className="text-xl font-black text-emerald-600">{campaignStatus.sent}</p>
@@ -339,6 +346,7 @@ export function ContactImporter() {
                   <p className="text-xl font-black text-amber-600">{campaignStatus.pending}</p>
                 </div>
               </div>
+              </>
             ) : (
               <p className="mt-3 text-sm text-slate-500">Carregando status da campanha...</p>
             )}

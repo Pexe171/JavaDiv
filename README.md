@@ -167,6 +167,42 @@ Inclui testes de serviços para regras críticas:
 Projeto preparado para evolução com filas (RabbitMQ/SQS) sem quebrar a camada de API.
 
 
+### Configuração de CORS (Back-end)
+
+A API já está preparada com `WebConfig` para aceitar requisições do front-end em:
+
+- `http://localhost:3000`
+
+Mapeamento aplicado para rotas `/api/**`, incluindo métodos `GET`, `POST`, `PUT`, `PATCH`, `DELETE` e `OPTIONS`.
+
+### Front-end (Next.js + Tailwind CSS)
+
+Foi adicionado o módulo web em `frontend/` com:
+
+- Next.js (App Router)
+- Tailwind CSS
+- React Hooks (`useState`, `useEffect`, `useMemo`) para estado de upload, progresso e resposta da API
+- Área drag-and-drop para ficheiro `.txt`
+- Envio do conteúdo bruto para `POST /api/contacts/import-lines` com `Content-Type: text/plain`
+- Cards de resumo visual para importados, inválidos e duplicados
+
+#### Executar front-end
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+A aplicação sobe em `http://localhost:3000` e por padrão aponta para `http://localhost:8080`.
+
+Se necessário, ajuste via variável:
+
+```bash
+NEXT_PUBLIC_API_URL=http://localhost:8080
+```
+
+
 ## Execução com Docker
 
 Antes de subir a aplicação, garanta que o container do banco (`pg-lives`) esteja em execução.

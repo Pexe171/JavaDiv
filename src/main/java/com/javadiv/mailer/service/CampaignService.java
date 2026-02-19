@@ -77,12 +77,31 @@ public class CampaignService {
     @Transactional(readOnly = true)
     public CampaignStatusResponse status(Long id) {
         Campaign campaign = getCampaign(id);
+        List<CampaignErrorLogResponse> erros = recipientRepository
+                .findTop50ByCampaignIdAndStatusOrderByIdDesc(id, RecipientStatus.FAILED)
+                .stream()
+                .map(recipient -> new CampaignErrorLogResponse(
+                        recipient.getContact().getEmail(),
+                        recipient.getErrorMessage(),
+                        recipient.getSentAt()
+                ))
+                .toList();
+
         return new CampaignStatusResponse(
                 campaign.getId(),
                 campaign.getStatus(),
                 recipientRepository.countByCampaignIdAndStatus(id, RecipientStatus.PENDING),
                 recipientRepository.countByCampaignIdAndStatus(id, RecipientStatus.SENT),
-                recipientRepository.countByCampaignIdAndStatus(id, RecipientStatus.FAILED)
+                recipientRepository.countByCampaignIdAndStatus(id, RecipientStatus.FAILED),
+                erros
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public MailBatchConfigResponse mailBatchConfig() {
+        return new MailBatchConfigResponse(
+                mailBatchProperties.batchSize(),
+                mailBatchProperties.batchIntervalSeconds()
         );
     }
 

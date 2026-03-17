@@ -21,11 +21,11 @@ import { toSafeFileSegment } from "../utils/time";
 import { parseKeyValueEntries, toIdSet } from "./args";
 
 interface CommonOptions {
-  debug?: boolean;
-  profile?: string;
+  debug?: boolean | undefined;
+  profile?: string | undefined;
 }
 
-async function loadRuntimeConfig(options: CommonOptions & { clearSession?: boolean }): Promise<{ config: AppConfig; logger: Logger }> {
+async function loadRuntimeConfig(options: CommonOptions & { clearSession?: boolean | undefined }): Promise<{ config: AppConfig; logger: Logger }> {
   const baseConfig = await loadAppConfig({
     debug: Boolean(options.debug),
     clearSessionOnStart: Boolean(options.clearSession)
@@ -179,12 +179,23 @@ async function runStartCommand(targetUrl: string, options: { debug?: boolean; pr
   interceptor.attachToContext(browserSession.context);
   logger.info("Faça login manualmente no ambiente autorizado. Use Ctrl+C no terminal para encerrar a captura com segurança.");
 
-  const browserClosedPromise = browserSession.browser.waitForEvent("disconnected").then(() => undefined);
+  const browserClosedPromise = new Promise<void>((resolve) => {
+    browserSession.browser.on("disconnected", () => resolve());
+  });
   const stopReason = await waitForCaptureStop(browserClosedPromise, logger);
 
   if (stopReason === "signal" && browserSession.browser.isConnected()) {
-    await persistSessionState(browserSession.context, config, logger);
-    await browserSession.browser.close();
+    try {
+      await persistSessionState(browserSession.context, config, logger);
+    } catch (error) {
+      logger.warn(`Não foi possível persistir a sessão antes do encerramento: ${error instanceof Error ? error.message : String(error)}`);
+    }
+
+    try {
+      await browserSession.browser.close();
+    } catch (error) {
+      logger.debug(`Falha ignorada ao fechar browser: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 
   const records = interceptor.getRecords();

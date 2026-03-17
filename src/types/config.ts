@@ -5,7 +5,7 @@ export interface RedactionRule {
   keyPattern: string;
   replacement: string;
   applyTo: RedactionTarget;
-  valuePattern?: string;
+  valuePattern?: string | undefined;
 }
 
 export interface AppConfig {
@@ -35,7 +35,7 @@ export interface SessionState {
   sessionFile: string;
   exists: boolean;
   expired: boolean;
-  lastUpdatedAt?: string;
+  lastUpdatedAt?: string | undefined;
   cookieCount: number;
   originCount: number;
 }

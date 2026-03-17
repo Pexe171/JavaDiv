@@ -14,13 +14,13 @@ export interface CapturedRequest {
   bodyPreview: string;
   bodyTruncated: boolean;
   resourceType: string;
-  frameUrl?: string;
-  pageUrl?: string;
-  initiator?: string;
+  frameUrl?: string | undefined;
+  pageUrl?: string | undefined;
+  initiator?: string | undefined;
 }
 
 export interface CapturedResponse {
-  status?: number;
+  status?: number | undefined;
   headers: Record<string, string>;
   body: unknown;
   bodyPreview: string;
@@ -28,28 +28,28 @@ export interface CapturedResponse {
   durationMs: number;
   ok: boolean;
   redirected: boolean;
-  contentType?: string;
-  error?: string;
+  contentType?: string | undefined;
+  error?: string | undefined;
 }
 
 export interface RequestRecord {
   request: CapturedRequest;
-  response?: CapturedResponse;
+  response?: CapturedResponse | undefined;
   relevance: RelevanceScore;
   scoreValue: number;
   scoreReasons: string[];
   relevant: boolean;
-  flowId?: string;
-  flowName?: string;
+  flowId?: string | undefined;
+  flowName?: string | undefined;
   autoObservations: string[];
   manuallyImportant: boolean;
   notes: string[];
-  ignoredReason?: string;
+  ignoredReason?: string | undefined;
 }
 
 export interface ExportArtifact {
   format: string;
   filePath: string;
-  requestId?: string;
+  requestId?: string | undefined;
   content: string;
 }

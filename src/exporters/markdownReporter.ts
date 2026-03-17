@@ -15,8 +15,8 @@ export interface SessionSummary {
   topEndpointsByFrequency: Array<{ pathname: string; count: number }>;
   topMutableEndpoints: Array<{ pathname: string; count: number }>;
   flowsDetected: Array<{ id: string; name: string; requests: number }>;
-  highPriorityRequests: Array<{ id: string; method: string; pathname: string; status?: number; flowName?: string }>;
-  httpFailures: Array<{ id: string; pathname: string; status?: number; error?: string }>;
+  highPriorityRequests: Array<{ id: string; method: string; pathname: string; status?: number | undefined; flowName?: string | undefined }>;
+  httpFailures: Array<{ id: string; pathname: string; status?: number | undefined; error?: string | undefined }>;
   inferredUserActions: string[];
   generatedFiles: string[];
 }
@@ -100,9 +100,7 @@ export function renderSessionMarkdown(summary: SessionSummary): string {
     ...summary.generatedFiles.map((filePath) => `- ${filePath}`)
   ];
 
-  return `${lines.join("
-")}
-`;
+  return `${lines.join("\n")}\n`;
 }
 
 export async function saveMarkdownSummary(summary: SessionSummary, config: AppConfig): Promise<ExportArtifact> {
@@ -118,7 +116,6 @@ export async function saveMarkdownSummary(summary: SessionSummary, config: AppCo
 
 export async function saveJsonSummary(summary: SessionSummary, config: AppConfig): Promise<string> {
   const filePath = path.join(config.outputDirectory, "reports", `${summary.sessionId}.json`);
-  await saveText(filePath, `${stableStringify(summary)}
-`);
+  await saveText(filePath, `${stableStringify(summary)}\n`);
   return filePath;
 }

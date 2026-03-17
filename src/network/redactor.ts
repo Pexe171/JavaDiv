@@ -2,12 +2,12 @@ import type { AppConfig, RedactionTarget } from "../types/config";
 
 import { byteLength, isPlainObject, safeJsonParse, stableStringify, truncateString } from "../utils/json";
 
-const emailPattern = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
-const cpfPattern = /\d{3}\.?\d{3}\.?\d{3}-?\d{2}/g;
-const phonePattern = /(?:\+?55\s?)?(?:\(?\d{2}\)?\s?)?\d{4,5}-?\d{4}/g;
+const emailPattern = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi;
+const cpfPattern = /\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b/g;
+const phonePattern = /\b(?:\+?55\s?)?(?:\(?\d{2}\)?\s?)?\d{4,5}-?\d{4}\b/g;
 const bearerPattern = /Bearer\s+[A-Za-z0-9\-._~+/]+=*/gi;
 const basicPattern = /Basic\s+[A-Za-z0-9+/=]+/gi;
-const tokenPattern = /(?:eyJ[a-zA-Z0-9_\-.]+|[A-F0-9]{32,}|[a-zA-Z0-9_-]{24,})/g;
+const tokenPattern = /\b(?:eyJ[a-zA-Z0-9_\-.]+|[A-F0-9]{32,}|[a-zA-Z0-9_-]{24,})\b/g;
 
 export interface RedactionResult {
   data: unknown;
@@ -193,7 +193,6 @@ export class NetworkRedactor {
   }
 
   private isTextLike(value: string): boolean {
-    return /^[	
- -~-ɏ]*$/.test(value);
+    return /^[\t\n\r\x20-\x7E\x80-\u024F]*$/u.test(value);
   }
 }

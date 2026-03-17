@@ -12,7 +12,7 @@ import { ensureRuntimeDirectories } from "../storage/fileManager";
 import type { AppConfig } from "../types/config";
 import { Logger } from "../utils/logger";
 import { parseKeyValueEntries, toIdSet } from "./args";
-import { applyManualAdjustments, loadAnalysisWorkspace, loadRequestRecords, persistSessionArtifacts, regroupRecords, renameFlows } from "./workspace";
+import { applyManualAdjustments, loadAnalysisWorkspace, loadRequestRecords, persistSessionArtifacts, reclassifyRecords, regroupRecords, renameFlows } from "./workspace";
 import { ReviewTui } from "../tui/reviewTui";
 
 interface CommonOptions {
@@ -105,7 +105,7 @@ async function runAnalyzeCommand(
   options: { debug?: boolean; important?: string[]; note?: string[]; renameFlow?: string[] }
 ): Promise<void> {
   const { config, logger } = await loadRuntimeConfig({ debug: options.debug });
-  const records = await loadRequestRecords(inputDirectory);
+  const records = reclassifyRecords(await loadRequestRecords(inputDirectory), config);
   const importantIds = toIdSet(options.important);
   const noteMap = parseKeyValueEntries(options.note);
   const renameMap = parseKeyValueEntries(options.renameFlow);
@@ -144,7 +144,7 @@ async function runExportCommand(
 
 async function runReportCommand(inputDirectory: string | undefined, options: { debug?: boolean }): Promise<void> {
   const { config, logger } = await loadRuntimeConfig({ debug: options.debug });
-  const records = await loadRequestRecords(inputDirectory ?? path.join(config.outputDirectory, "requests"));
+  const records = reclassifyRecords(await loadRequestRecords(inputDirectory ?? path.join(config.outputDirectory, "requests")), config);
   const grouped = regroupRecords(records, config);
   const summary = await persistSessionArtifacts(grouped.records, grouped.flows, config, "report-only");
   logger.info(`Relatório ${summary.sessionId} gerado com ${summary.totalRequestsObserved} requests.`);

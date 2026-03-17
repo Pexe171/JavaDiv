@@ -77,6 +77,7 @@ export class ReviewTui {
 
   private cleanup(): void {
     process.stdin.off("keypress", this.onKeypressBound);
+    process.stdin.pause();
     if (process.stdin.isTTY) {
       process.stdin.setRawMode(false);
     }
@@ -154,7 +155,7 @@ export class ReviewTui {
   private cycleFilter(): void {
     const order: FilterMode[] = ["all", "relevant", "high"];
     const currentIndex = order.indexOf(this.filterMode);
-    this.filterMode = order[(currentIndex + 1) % order.length];
+    this.filterMode = order[(currentIndex + 1) % order.length] ?? "all";
     this.selectedRequestIndex = 0;
     this.quitArmed = false;
     this.message = `Filtro ativo: ${this.filterMode}.`;

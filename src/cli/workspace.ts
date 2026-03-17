@@ -2,6 +2,7 @@ import path from "node:path";
 
 import { flowGroupSchema, requestRecordSchema } from "../config/schema";
 import { buildSessionSummary, saveJsonSummary, saveMarkdownSummary, type SessionSummary } from "../exporters/markdownReporter";
+import { RequestClassifier } from "../network/requestClassifier";
 import { FlowGrouper } from "../network/flowGrouper";
 import { listJsonFiles, readJsonFile, toAbsolutePath } from "../storage/fileManager";
 import { saveJson } from "../storage/saveJson";
@@ -41,8 +42,43 @@ export function regroupRecords(records: RequestRecord[], config: AppConfig): { r
   return new FlowGrouper(config).group(records);
 }
 
+export function reclassifyRecords(records: RequestRecord[], config: AppConfig): RequestRecord[] {
+  const classifier = new RequestClassifier(config);
+  const sorted = [...records].sort((left, right) => left.request.sequence - right.request.sequence);
+  const reclassified: RequestRecord[] = [];
+
+  for (const record of sorted) {
+    const updatedRecord: RequestRecord = {
+      ...record,
+      domainSignals: [],
+      scoreReasons: [],
+      autoObservations: [],
+      notes: [...record.notes]
+    };
+
+    const classification = classifier.classify(updatedRecord, reclassified.slice(-10));
+    updatedRecord.relevance = classification.label;
+    updatedRecord.scoreValue = classification.score;
+    updatedRecord.scoreReasons = [...classification.reasons];
+    updatedRecord.relevant = classification.relevant;
+    updatedRecord.autoObservations = [...classification.observations];
+
+    if (updatedRecord.manuallyImportant) {
+      updatedRecord.relevance = "HIGH";
+      updatedRecord.relevant = true;
+      if (!updatedRecord.scoreReasons.includes("Marcado manualmente como importante.")) {
+        updatedRecord.scoreReasons.push("Marcado manualmente como importante.");
+      }
+    }
+
+    reclassified.push(updatedRecord);
+  }
+
+  return reclassified;
+}
+
 export async function loadAnalysisWorkspace(inputDirectory: string, config: AppConfig): Promise<AnalysisWorkspace> {
-  const records = await loadRequestRecords(inputDirectory);
+  const records = reclassifyRecords(await loadRequestRecords(inputDirectory), config);
   const grouped = regroupRecords(records, config);
   return {
     inputDirectory: toAbsolutePath(inputDirectory),

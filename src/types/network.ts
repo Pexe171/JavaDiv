@@ -39,6 +39,9 @@ export interface RequestRecord {
   scoreValue: number;
   scoreReasons: string[];
   relevant: boolean;
+  domainDefinitionId?: string | undefined;
+  domainStage?: string | undefined;
+  domainSignals: string[];
   flowId?: string | undefined;
   flowName?: string | undefined;
   autoObservations: string[];

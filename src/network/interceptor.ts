@@ -109,6 +109,7 @@ export class NetworkInterceptor {
         scoreValue: 0,
         scoreReasons: [],
         relevant: false,
+        domainSignals: [],
         autoObservations: [],
         manuallyImportant: false,
         notes: []
@@ -149,6 +150,7 @@ export class NetworkInterceptor {
         scoreValue: 0,
         scoreReasons: [],
         relevant: false,
+        domainSignals: [],
         autoObservations: ["Request failed before a valid response was received."],
         manuallyImportant: false,
         notes: []

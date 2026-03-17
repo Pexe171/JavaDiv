@@ -1,5 +1,6 @@
 import type { AppConfig } from "../types/config";
 import type { RequestRecord, RelevanceScore } from "../types/network";
+import { findPrimaryDomainMatch, findSequenceRule, summarizeDomainReason } from "./domainHeuristics";
 
 export interface ClassificationResult {
   label: RelevanceScore;
@@ -47,6 +48,19 @@ export class RequestClassifier {
       reasons.push("Resposta JSON detectada.");
     }
 
+    const primaryDomainMatch = findPrimaryDomainMatch(record, this.config);
+    if (primaryDomainMatch) {
+      record.domainDefinitionId = primaryDomainMatch.definition.id;
+      record.domainStage = primaryDomainMatch.definition.stage;
+      record.domainSignals = [...primaryDomainMatch.signals];
+      score += primaryDomainMatch.scoreBoost;
+      reasons.push(summarizeDomainReason(primaryDomainMatch));
+    } else {
+      record.domainDefinitionId = undefined;
+      record.domainStage = undefined;
+      record.domainSignals = [];
+    }
+
     const matchedKeywords = this.config.relevanceKeywords.filter((keyword) => searchableContent.includes(keyword.toLowerCase()));
     if (matchedKeywords.length > 0) {
       const keywordBoost = Math.min(30, matchedKeywords.length * 10);
@@ -63,6 +77,18 @@ export class RequestClassifier {
       reasons.push("Chamada ocorreu em sequência curta com outras requisições relevantes.");
     }
 
+    const previousStagedRecord = [...recentRecords]
+      .reverse()
+      .find((recent) => recent.domainStage !== undefined);
+    if (primaryDomainMatch && previousStagedRecord?.domainStage) {
+      const delta = Math.abs(Date.parse(record.request.timestamp) - Date.parse(previousStagedRecord.request.timestamp));
+      const sequenceRule = findSequenceRule(previousStagedRecord.domainStage, primaryDomainMatch.definition.stage, delta, this.config);
+      if (sequenceRule) {
+        score += sequenceRule.scoreBoost;
+        reasons.push(`Transição de fluxo coerente: ${sequenceRule.fromStage} -> ${sequenceRule.toStage}.`);
+      }
+    }
+
     if (record.response?.status !== undefined && record.response.status >= 400) {
       score += 10;
       observations.push(`Falha HTTP ${record.response.status} detectada.`);
@@ -76,7 +102,11 @@ export class RequestClassifier {
       observations.push("Payload truncado para persistência segura.");
     }
 
-    const relevant = mutableMethods.has(record.request.method) || matchedKeywords.length > 0 || score >= this.config.mediumThreshold;
+    const relevant =
+      mutableMethods.has(record.request.method) ||
+      matchedKeywords.length > 0 ||
+      primaryDomainMatch !== undefined ||
+      score >= this.config.mediumThreshold;
     const label: RelevanceScore = score >= this.config.highThreshold ? "HIGH" : score >= this.config.mediumThreshold ? "MEDIUM" : "LOW";
 
     return {

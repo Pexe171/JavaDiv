@@ -63,6 +63,8 @@ O projeto abre o Chromium em modo visível, permite **login manual**, observa re
     ├── storage/
     │   ├── fileManager.ts
     │   └── saveJson.ts
+    ├── tui/
+    │   └── reviewTui.ts
     ├── types/
     │   ├── config.ts
     │   ├── flow.ts
@@ -85,6 +87,7 @@ O projeto abre o Chromium em modo visível, permite **login manual**, observa re
 - `network/requestParser.ts`: filtra fetch/xhr relevantes, normaliza request/response e extrai dados estruturados.
 - `network/redactor.ts`: aplica mascaramento obrigatório antes de qualquer persistência.
 - `network/requestClassifier.ts`: faz scoring LOW/MEDIUM/HIGH configurável por heurística.
+- `network/domainHeuristics.ts`: adiciona reconhecimento explícito do domínio de cliente/simulação/proposta/documentos/contrato/finalização.
 - `network/flowGrouper.ts`: agrupa requests por janela temporal, rota ativa e semântica inferida.
 - `network/interceptor.ts`: conecta tudo em runtime e imprime feedback no terminal em tempo real.
 
@@ -97,6 +100,8 @@ O projeto abre o Chromium em modo visível, permite **login manual**, observa re
 
 ### 5. Camada de CLI
 - `cli/commands.ts`: orquestra `start`, `analyze`, `export`, `report` e `clear-session`.
+- `cli/workspace.ts`: centraliza leitura, reagrupamento, ajustes manuais e persistência offline.
+- `tui/reviewTui.ts`: TUI interativa para revisão e curadoria dos artefatos.
 
 ## Instalação
 
@@ -155,6 +160,25 @@ npm run dev -- export --format axios
 npm run dev -- export --format httpx
 npm run dev -- export --format curl
 ```
+
+### Abrir a TUI interativa
+
+```bash
+npm run dev -- tui
+npm run dev -- tui ./logs/requests
+```
+
+Atalhos principais:
+
+- `Tab`: alterna entre painel de flows e requests
+- `j` / `k` ou setas: navega
+- `i`: marca/desmarca request como importante
+- `n`: adiciona nota à request selecionada
+- `r`: renomeia o flow selecionado
+- `g`: reaplica as heurísticas refinadas de agrupamento
+- `e`: exporta a request atual em axios/httpx/curl
+- `s`: salva os artefatos revisados
+- `q`: sai da TUI
 
 Filtrando por request específica:
 
@@ -267,7 +291,28 @@ Edite `config/redaction.json`:
 Controla allowlist e ruído irrelevante.
 
 ### `config/keywords.json`
-Controla palavras-chave de relevância, thresholds e janela temporal dos fluxos.
+Controla palavras-chave de relevância, thresholds, janela temporal e as heurísticas do domínio.
+
+O arquivo agora também define:
+- `domainFlowDefinitions`
+- `domainSequenceRules`
+
+Essas estruturas modelam um domínio típico de crédito/proposta com estágios como:
+
+- `authentication`
+- `customer_lookup`
+- `eligibility_bootstrap`
+- `simulation`
+- `proposal_submission`
+- `document_upload`
+- `approval_review`
+- `contract_signature`
+- `finalization`
+
+As transições configuradas ajudam a:
+- aumentar score de requests coerentes com a jornada funcional;
+- separar fluxos por etapa de negócio;
+- tornar a TUI mais útil para revisão de ponta a ponta.
 
 ### `config/redaction.json`
 Controla campos sensíveis e regras adicionais de mascaramento.
@@ -319,7 +364,7 @@ A sanitização fica concentrada em `network/redactor.ts`. Isso reduz o risco de
 O `storageState` é salvo por perfil (`default`, `staging`, `qa` etc.). O trade-off é manter arquivos extras em `/sessions`, mas melhora isolamento entre ambientes autorizados.
 
 ### Agrupamento heurístico
-Os fluxos são inferidos por janela temporal + rota + palavras-chave. É uma aproximação robusta para troubleshooting, embora não substitua instrumentação de negócio explícita.
+Os fluxos são inferidos por janela temporal + rota + palavras-chave + estágios de domínio. Isso melhora bastante a leitura de jornadas como busca de cliente -> simulação -> proposta -> documentos -> aprovação -> contrato.
 
 ## Limitações conhecidas
 
@@ -327,7 +372,8 @@ Os fluxos são inferidos por janela temporal + rota + palavras-chave. É uma apr
 - o campo `initiator` é aproximado a partir de frame/page;
 - ações manuais do usuário são inferidas, não rastreadas diretamente do DOM;
 - respostas binárias são resumidas em vez de persistidas integralmente;
-- `GET` é capturada apenas quando combina com palavras-chave configuradas.
+- `GET` é capturada apenas quando combina com palavras-chave configuradas;
+- a TUI depende de um terminal TTY real para funcionamento interativo.
 
 ## Critérios de aceite cobertos
 

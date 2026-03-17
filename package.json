@@ -18,6 +18,7 @@
     "analyze": "tsx src/index.ts analyze ./logs/requests",
     "export": "tsx src/index.ts export --format axios",
     "report": "tsx src/index.ts report",
+    "tui": "tsx src/index.ts tui ./logs/requests",
     "clear-session": "tsx src/index.ts clear-session",
     "postinstall": "playwright install chromium"
   },

@@ -3,6 +3,8 @@ import type { RelevanceScore } from "./network";
 export interface FlowGroup {
   id: string;
   name: string;
+  domainStage?: string | undefined;
+  primaryDefinitionId?: string | undefined;
   routeContext: string;
   startedAt: string;
   endedAt: string;

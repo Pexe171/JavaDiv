@@ -4,21 +4,16 @@ import { Command } from "commander";
 import { initBrowser } from "../browser/initBrowser";
 import { clearSessionState, persistSessionState } from "../browser/sessionManager";
 import { loadAppConfig, withSessionProfile } from "../config/defaultConfig";
-import { flowGroupSchema, requestRecordSchema } from "../config/schema";
 import { exportAxiosArtifacts } from "../exporters/axiosExporter";
 import { exportCurlArtifacts } from "../exporters/curlExporter";
-import { buildSessionSummary, saveJsonSummary, saveMarkdownSummary, type SessionSummary } from "../exporters/markdownReporter";
 import { exportHttpxArtifacts } from "../exporters/httpxExporter";
-import { FlowGrouper } from "../network/flowGrouper";
 import { NetworkInterceptor } from "../network/interceptor";
-import { ensureRuntimeDirectories, listJsonFiles, readJsonFile, toAbsolutePath } from "../storage/fileManager";
-import { saveJson } from "../storage/saveJson";
+import { ensureRuntimeDirectories } from "../storage/fileManager";
 import type { AppConfig } from "../types/config";
-import type { FlowGroup } from "../types/flow";
-import type { RequestRecord } from "../types/network";
 import { Logger } from "../utils/logger";
-import { toSafeFileSegment } from "../utils/time";
 import { parseKeyValueEntries, toIdSet } from "./args";
+import { applyManualAdjustments, loadAnalysisWorkspace, loadRequestRecords, persistSessionArtifacts, regroupRecords, renameFlows } from "./workspace";
+import { ReviewTui } from "../tui/reviewTui";
 
 interface CommonOptions {
   debug?: boolean | undefined;
@@ -34,107 +29,6 @@ async function loadRuntimeConfig(options: CommonOptions & { clearSession?: boole
   const logger = new Logger(config.debug);
   await ensureRuntimeDirectories(config);
   return { config, logger };
-}
-
-async function loadRequestRecords(inputDirectory: string): Promise<RequestRecord[]> {
-  const directory = toAbsolutePath(inputDirectory);
-  const files = await listJsonFiles(directory);
-  const records: RequestRecord[] = [];
-
-  for (const filePath of files) {
-    const parsed = await readJsonFile<unknown>(filePath);
-    if (!parsed) {
-      continue;
-    }
-    records.push(requestRecordSchema.parse(parsed) as RequestRecord);
-  }
-
-  return records.sort((left, right) => left.request.sequence - right.request.sequence);
-}
-
-async function persistRequestFiles(records: RequestRecord[], config: AppConfig): Promise<string[]> {
-  const files: string[] = [];
-  for (const record of records) {
-    requestRecordSchema.parse(record);
-    const filePath = path.join(config.outputDirectory, "requests", `request-${record.request.id}.json`);
-    await saveJson(filePath, record);
-    files.push(filePath);
-  }
-  return files;
-}
-
-async function persistFlowFiles(flows: FlowGroup[], config: AppConfig, sessionId: string): Promise<string[]> {
-  const files: string[] = [];
-  for (const [index, flow] of flows.entries()) {
-    flowGroupSchema.parse(flow);
-    const filePath = path.join(
-      config.outputDirectory,
-      "flows",
-      `flow-${sessionId}-${String(index + 1).padStart(2, "0")}-${toSafeFileSegment(flow.name)}.json`
-    );
-    await saveJson(filePath, flow);
-    files.push(filePath);
-  }
-  return files;
-}
-
-async function finalizeSummary(
-  summary: SessionSummary,
-  records: RequestRecord[],
-  flows: FlowGroup[],
-  generatedFiles: string[],
-  config: AppConfig
-): Promise<{ summary: SessionSummary; reportPath: string; markdownPath: string }> {
-  const finalSummary: SessionSummary = {
-    ...summary,
-    generatedFiles
-  };
-
-  const reportPath = await saveJsonSummary(finalSummary, config);
-  const markdownArtifact = await saveMarkdownSummary(finalSummary, config);
-
-  return {
-    summary: finalSummary,
-    reportPath,
-    markdownPath: markdownArtifact.filePath
-  };
-}
-
-async function persistSessionArtifacts(
-  records: RequestRecord[],
-  flows: FlowGroup[],
-  config: AppConfig,
-  targetUrl: string
-): Promise<SessionSummary> {
-  const initialSummary = buildSessionSummary(records, flows, []);
-  const requestFiles = await persistRequestFiles(records, config);
-  const flowFiles = await persistFlowFiles(flows, config, initialSummary.sessionId);
-  const sessionFilePath = path.join(config.outputDirectory, "sessions", `${initialSummary.sessionId}.json`);
-  const generatedFiles = [...requestFiles, ...flowFiles, sessionFilePath];
-  const finalized = await finalizeSummary(initialSummary, records, flows, generatedFiles, config);
-  const completeGeneratedFiles = [...generatedFiles, finalized.reportPath, finalized.markdownPath];
-  const finalSummary = {
-    ...finalized.summary,
-    generatedFiles: completeGeneratedFiles
-  };
-
-  await saveJson(finalized.reportPath, finalSummary);
-  await saveJson(
-    sessionFilePath,
-    {
-      sessionId: finalSummary.sessionId,
-      createdAt: finalSummary.createdAt,
-      targetUrl,
-      requestCount: records.length,
-      flowCount: flows.length,
-      requestFiles,
-      flowFiles,
-      reportFiles: [finalized.reportPath, finalized.markdownPath],
-      generatedFiles: completeGeneratedFiles
-    }
-  );
-
-  return finalSummary;
 }
 
 function waitForCaptureStop(browserClosePromise: Promise<void>, logger: Logger): Promise<"signal" | "browser_closed"> {
@@ -206,52 +100,6 @@ async function runStartCommand(targetUrl: string, options: { debug?: boolean; pr
   logger.info(`Sessão ${summary.sessionId} finalizada com ${summary.totalRequestsObserved} requests observadas.`);
 }
 
-function applyManualAdjustments(
-  records: RequestRecord[],
-  importantIds: Set<string>,
-  notesByRequestId: Map<string, string>
-): RequestRecord[] {
-  return records.map((record) => {
-    const updatedRecord: RequestRecord = {
-      ...record,
-      scoreReasons: [...record.scoreReasons],
-      autoObservations: [...record.autoObservations],
-      notes: [...record.notes]
-    };
-
-    if (importantIds.has(record.request.id)) {
-      updatedRecord.manuallyImportant = true;
-      updatedRecord.relevant = true;
-      updatedRecord.relevance = "HIGH";
-      if (!updatedRecord.scoreReasons.includes("Marcado manualmente como importante.")) {
-        updatedRecord.scoreReasons.push("Marcado manualmente como importante.");
-      }
-    }
-
-    const note = notesByRequestId.get(record.request.id);
-    if (note) {
-      updatedRecord.notes.push(note);
-    }
-
-    return updatedRecord;
-  });
-}
-
-function renameFlows(flows: FlowGroup[], records: RequestRecord[], renameMap: Map<string, string>): void {
-  for (const flow of flows) {
-    const renamed = renameMap.get(flow.id);
-    if (!renamed) {
-      continue;
-    }
-    flow.name = renamed;
-    for (const record of records) {
-      if (record.flowId === flow.id) {
-        record.flowName = renamed;
-      }
-    }
-  }
-}
-
 async function runAnalyzeCommand(
   inputDirectory: string,
   options: { debug?: boolean; important?: string[]; note?: string[]; renameFlow?: string[] }
@@ -262,8 +110,7 @@ async function runAnalyzeCommand(
   const noteMap = parseKeyValueEntries(options.note);
   const renameMap = parseKeyValueEntries(options.renameFlow);
   const updatedRecords = applyManualAdjustments(records, importantIds, noteMap);
-  const grouper = new FlowGrouper(config);
-  const grouped = grouper.group(updatedRecords);
+  const grouped = regroupRecords(updatedRecords, config);
   renameFlows(grouped.flows, grouped.records, renameMap);
   await persistSessionArtifacts(grouped.records, grouped.flows, config, "offline-analysis");
   logger.info(`Análise concluída com ${grouped.records.length} requests reprocessadas.`);
@@ -298,9 +145,20 @@ async function runExportCommand(
 async function runReportCommand(inputDirectory: string | undefined, options: { debug?: boolean }): Promise<void> {
   const { config, logger } = await loadRuntimeConfig({ debug: options.debug });
   const records = await loadRequestRecords(inputDirectory ?? path.join(config.outputDirectory, "requests"));
-  const grouped = new FlowGrouper(config).group(records);
+  const grouped = regroupRecords(records, config);
   const summary = await persistSessionArtifacts(grouped.records, grouped.flows, config, "report-only");
   logger.info(`Relatório ${summary.sessionId} gerado com ${summary.totalRequestsObserved} requests.`);
+}
+
+async function runTuiCommand(inputDirectory: string | undefined, options: { debug?: boolean }): Promise<void> {
+  const { config, logger } = await loadRuntimeConfig({ debug: options.debug });
+  const workspace = await loadAnalysisWorkspace(inputDirectory ?? path.join(config.outputDirectory, "requests"), config);
+  const tui = new ReviewTui({
+    config,
+    logger,
+    workspace
+  });
+  await tui.run();
 }
 
 async function runClearSessionCommand(options: { debug?: boolean; profile?: string }): Promise<void> {
@@ -355,6 +213,13 @@ export function createCli(): Command {
     .option("-p, --profile <name>", "Perfil da sessão", "default")
     .option("--debug", "Ativa logs detalhados")
     .action(async (options) => runClearSessionCommand(options));
+
+  program
+    .command("tui")
+    .description("Abre uma TUI interativa para revisar flows, requests, notas e marcações.")
+    .argument("[inputDirectory]", "Diretório com request JSONs")
+    .option("--debug", "Ativa logs detalhados")
+    .action(async (inputDirectory, options) => runTuiCommand(inputDirectory, options));
 
   return program;
 }

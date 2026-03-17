@@ -3,6 +3,7 @@ import type { FlowGroup } from "../types/flow";
 import type { RequestRecord, RelevanceScore } from "../types/network";
 
 import { toSafeFileSegment } from "../utils/time";
+import { findDomainDefinitionById, findSequenceRule } from "./domainHeuristics";
 
 const mutableMethods = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 const relevanceRank: Record<RelevanceScore, number> = { LOW: 1, MEDIUM: 2, HIGH: 3 };
@@ -23,10 +24,12 @@ export class FlowGrouper {
     const requestTime = Date.parse(record.request.timestamp);
 
     let targetFlow = lastFlow;
-    if (!targetFlow || this.shouldStartNewFlow(targetFlow, routeContext, inferredName, requestTime)) {
+    if (!targetFlow || this.shouldStartNewFlow(targetFlow, routeContext, inferredName, requestTime, record)) {
       targetFlow = {
         id: `flow-${record.request.sequence}-${toSafeFileSegment(inferredName)}`,
         name: inferredName,
+        domainStage: record.domainStage,
+        primaryDefinitionId: record.domainDefinitionId,
         routeContext,
         startedAt: record.request.timestamp,
         endedAt: record.request.timestamp,
@@ -45,6 +48,8 @@ export class FlowGrouper {
     }
 
     targetFlow.endedAt = record.request.timestamp;
+    targetFlow.domainStage = targetFlow.domainStage ?? record.domainStage;
+    targetFlow.primaryDefinitionId = targetFlow.primaryDefinitionId ?? record.domainDefinitionId;
     targetFlow.requestIds.push(record.request.id);
     const action = this.inferAction(record);
     if (!targetFlow.inferredActions.includes(action)) {
@@ -89,9 +94,27 @@ export class FlowGrouper {
     }));
   }
 
-  private shouldStartNewFlow(flow: FlowGroup, routeContext: string, inferredName: string, requestTime: number): boolean {
+  private shouldStartNewFlow(flow: FlowGroup, routeContext: string, inferredName: string, requestTime: number, record: RequestRecord): boolean {
     const delta = requestTime - Date.parse(flow.endedAt);
     if (delta > this.config.flowTimeWindowMs) {
+      return true;
+    }
+
+    const currentStage = record.domainStage;
+    if (flow.domainStage && currentStage) {
+      if (flow.domainStage === currentStage) {
+        if (routeContext !== flow.routeContext && delta > this.config.flowTimeWindowMs / 3) {
+          return true;
+        }
+
+        return false;
+      }
+
+      const sequenceRule = findSequenceRule(flow.domainStage, currentStage, delta, this.config);
+      if (sequenceRule) {
+        return true;
+      }
+
       return true;
     }
 
@@ -107,6 +130,11 @@ export class FlowGrouper {
   }
 
   private inferFlowName(record: RequestRecord): string {
+    const domainDefinition = findDomainDefinitionById(this.config, record.domainDefinitionId);
+    if (domainDefinition) {
+      return domainDefinition.name;
+    }
+
     const content = `${record.request.pathname} ${record.request.url}`.toLowerCase();
 
     if (/(login|signin|auth|oauth|token)/.test(content)) {
@@ -133,6 +161,11 @@ export class FlowGrouper {
   }
 
   private inferAction(record: RequestRecord): string {
+    const domainDefinition = findDomainDefinitionById(this.config, record.domainDefinitionId);
+    if (domainDefinition) {
+      return domainDefinition.actionLabel;
+    }
+
     if (mutableMethods.has(record.request.method)) {
       return `mutating ${record.request.method.toLowerCase()} call`;
     }

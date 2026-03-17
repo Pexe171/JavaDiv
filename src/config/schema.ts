@@ -7,6 +7,28 @@ export const redactionRuleSchema = z.object({
   valuePattern: z.string().optional()
 });
 
+export const domainFlowDefinitionSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  stage: z.string().min(1),
+  urlPatterns: z.array(z.string()).default([]),
+  requestKeywords: z.array(z.string()).default([]),
+  responseKeywords: z.array(z.string()).default([]),
+  routeKeywords: z.array(z.string()).default([]),
+  actionLabel: z.string().min(1),
+  baseScoreBoost: z.number().int().min(0).default(0),
+  mutableScoreBoost: z.number().int().min(0).default(0),
+  successScoreBoost: z.number().int().min(0).default(0),
+  startNewFlowOnMatch: z.boolean().default(true)
+});
+
+export const domainSequenceRuleSchema = z.object({
+  fromStage: z.string().min(1),
+  toStage: z.string().min(1),
+  maxGapMs: z.number().int().min(1).default(15000),
+  scoreBoost: z.number().int().min(0).default(0)
+});
+
 export const filtersConfigSchema = z.object({
   allowlistDomains: z.array(z.string()).default([]),
   ignoredResourceTypes: z.array(z.string()).default([]),
@@ -18,7 +40,9 @@ export const keywordsConfigSchema = z.object({
   relevanceKeywords: z.array(z.string()).default([]),
   mediumThreshold: z.number().int().min(1).default(40),
   highThreshold: z.number().int().min(1).default(70),
-  flowTimeWindowMs: z.number().int().min(1000).default(12000)
+  flowTimeWindowMs: z.number().int().min(1000).default(12000),
+  domainFlowDefinitions: z.array(domainFlowDefinitionSchema).default([]),
+  domainSequenceRules: z.array(domainSequenceRuleSchema).default([])
 });
 
 export const redactionConfigSchema = z.object({
@@ -46,6 +70,8 @@ export const appConfigSchema = z.object({
   maxBodyBytesToStore: z.number().int().min(64),
   customSensitiveFields: z.array(z.string()),
   redactionRules: z.array(redactionRuleSchema),
+  domainFlowDefinitions: z.array(domainFlowDefinitionSchema),
+  domainSequenceRules: z.array(domainSequenceRuleSchema),
   exportFormats: z.array(z.enum(["axios", "httpx", "curl", "markdown"]))
 });
 
@@ -89,6 +115,9 @@ export const requestRecordSchema = z.object({
   scoreValue: z.number().min(0),
   scoreReasons: z.array(z.string()),
   relevant: z.boolean(),
+  domainDefinitionId: z.string().optional(),
+  domainStage: z.string().optional(),
+  domainSignals: z.array(z.string()).default([]),
   flowId: z.string().optional(),
   flowName: z.string().optional(),
   autoObservations: z.array(z.string()),
@@ -100,6 +129,8 @@ export const requestRecordSchema = z.object({
 export const flowGroupSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
+  domainStage: z.string().optional(),
+  primaryDefinitionId: z.string().optional(),
   routeContext: z.string().min(1),
   startedAt: z.string().min(1),
   endedAt: z.string().min(1),

@@ -1,6 +1,28 @@
 export type ExportFormat = "axios" | "httpx" | "curl" | "markdown";
 export type RedactionTarget = "headers" | "body" | "query" | "all";
 
+export interface DomainFlowDefinition {
+  id: string;
+  name: string;
+  stage: string;
+  urlPatterns: string[];
+  requestKeywords: string[];
+  responseKeywords: string[];
+  routeKeywords: string[];
+  actionLabel: string;
+  baseScoreBoost: number;
+  mutableScoreBoost: number;
+  successScoreBoost: number;
+  startNewFlowOnMatch: boolean;
+}
+
+export interface DomainSequenceRule {
+  fromStage: string;
+  toStage: string;
+  maxGapMs: number;
+  scoreBoost: number;
+}
+
 export interface RedactionRule {
   keyPattern: string;
   replacement: string;
@@ -28,6 +50,8 @@ export interface AppConfig {
   maxBodyBytesToStore: number;
   customSensitiveFields: string[];
   redactionRules: RedactionRule[];
+  domainFlowDefinitions: DomainFlowDefinition[];
+  domainSequenceRules: DomainSequenceRule[];
   exportFormats: ExportFormat[];
 }
 

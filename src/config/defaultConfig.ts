@@ -25,7 +25,7 @@ export const defaultAppConfig: AppConfig = {
   requestBodyPreviewLimit: 512,
   responseBodyPreviewLimit: 768,
   maxBodyBytesToStore: 16384,
-  customSensitiveFields: ["authorization", "cookie", "set-cookie", "csrf", "token", "password", "secret", "cpf", "email", "phone", "fullName", "nomeCompleto"],
+  customSensitiveFields: ["authorization", "cookie", "set-cookie", "csrf", "token", "password", "secret", "cpf", "email", "phone", "fullName", "nomeCompleto", "customerName", "name", "motherName"],
   redactionRules: [
     { keyPattern: "authorization", replacement: "Bearer ***REDACTED***", applyTo: "headers" },
     { keyPattern: "cookie", replacement: "***REDACTED***", applyTo: "headers" },

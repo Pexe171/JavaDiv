@@ -11,7 +11,10 @@
     "email",
     "phone",
     "fullName",
-    "nomeCompleto"
+    "nomeCompleto",
+    "customerName",
+    "name",
+    "motherName"
   ],
   "rules": [
     {

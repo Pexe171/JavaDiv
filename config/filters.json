@@ -1,0 +1,27 @@
+{
+  "allowlistDomains": [],
+  "ignoredResourceTypes": [
+    "image",
+    "media",
+    "font",
+    "stylesheet",
+    "manifest"
+  ],
+  "ignoredUrlPatterns": [
+    "analytics",
+    "telemetry",
+    "hot-update",
+    "sockjs-node",
+    "webpack-hmr",
+    "/_next/static/",
+    "/favicon.ico"
+  ],
+  "includeGetKeywords": [
+    "bootstrap",
+    "config",
+    "session",
+    "customer",
+    "proposal",
+    "simulation"
+  ]
+}

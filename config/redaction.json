@@ -1,0 +1,61 @@
+{
+  "customSensitiveFields": [
+    "authorization",
+    "cookie",
+    "set-cookie",
+    "csrf",
+    "token",
+    "password",
+    "secret",
+    "cpf",
+    "email",
+    "phone",
+    "fullName",
+    "nomeCompleto",
+    "customerName",
+    "name",
+    "motherName"
+  ],
+  "rules": [
+    {
+      "keyPattern": "authorization",
+      "replacement": "Bearer ***REDACTED***",
+      "applyTo": "headers"
+    },
+    {
+      "keyPattern": "cookie",
+      "replacement": "***REDACTED***",
+      "applyTo": "headers"
+    },
+    {
+      "keyPattern": "set-cookie",
+      "replacement": "***REDACTED***",
+      "applyTo": "headers"
+    },
+    {
+      "keyPattern": "csrf",
+      "replacement": "***REDACTED***",
+      "applyTo": "all"
+    },
+    {
+      "keyPattern": "token",
+      "replacement": "***REDACTED***",
+      "applyTo": "all"
+    },
+    {
+      "keyPattern": "password",
+      "replacement": "***REDACTED***",
+      "applyTo": "body"
+    },
+    {
+      "keyPattern": "cpf",
+      "replacement": "***REDACTED***",
+      "applyTo": "body"
+    },
+    {
+      "keyPattern": "email",
+      "replacement": "***REDACTED***",
+      "applyTo": "body"
+    }
+  ]
+}

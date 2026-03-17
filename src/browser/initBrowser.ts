@@ -25,8 +25,7 @@ export async function initBrowser(options: InitBrowserOptions): Promise<BrowserS
   const context = await browser.newContext(storageState ? { storageState } : {});
   const page = await context.newPage();
 
-  options.logger.info(`Abrindo Chromium visível em ${options.targetUrl}`);
-  await page.goto(options.targetUrl, { waitUntil: "domcontentloaded" });
+  options.logger.info("Chromium visível iniciado com sucesso.");
 
   return {
     browser,

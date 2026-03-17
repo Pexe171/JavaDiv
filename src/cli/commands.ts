@@ -177,6 +177,8 @@ async function runStartCommand(targetUrl: string, options: { debug?: boolean; pr
 
   const interceptor = new NetworkInterceptor(config, logger);
   interceptor.attachToContext(browserSession.context);
+  logger.info(`Abrindo Chromium visível em ${targetUrl}`);
+  await browserSession.page.goto(targetUrl, { waitUntil: "domcontentloaded" });
   logger.info("Faça login manualmente no ambiente autorizado. Use Ctrl+C no terminal para encerrar a captura com segurança.");
 
   const browserClosedPromise = new Promise<void>((resolve) => {

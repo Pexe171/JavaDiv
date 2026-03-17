@@ -6,6 +6,7 @@ import { clearSessionState, persistSessionState } from "../browser/sessionManage
 import { loadAppConfig, withSessionProfile } from "../config/defaultConfig";
 import { exportAxiosArtifacts } from "../exporters/axiosExporter";
 import { exportCurlArtifacts } from "../exporters/curlExporter";
+import { exportFetchArtifacts } from "../exporters/fetchExporter";
 import { exportHttpxArtifacts } from "../exporters/httpxExporter";
 import { NetworkInterceptor } from "../network/interceptor";
 import { ensureRuntimeDirectories } from "../storage/fileManager";
@@ -94,6 +95,7 @@ async function runStartCommand(targetUrl: string, options: { debug?: boolean; pr
     }
   }
 
+  interceptor.dispose();
   const records = interceptor.getRecords();
   const flows = interceptor.getFlows();
   const summary = await persistSessionArtifacts(records, flows, config, targetUrl);
@@ -135,6 +137,8 @@ async function runExportCommand(
     await exportHttpxArtifacts(filteredRecords, config);
   } else if (options.format === "curl") {
     await exportCurlArtifacts(filteredRecords, config);
+  } else if (options.format === "fetch") {
+    await exportFetchArtifacts(filteredRecords, config);
   } else {
     throw new Error(`Formato de exportação não suportado: ${options.format}`);
   }
@@ -194,7 +198,7 @@ export function createCli(): Command {
   program
     .command("export")
     .description("Gera artefatos sanitizados para integração legítima.")
-    .requiredOption("--format <format>", "Formato: axios, httpx ou curl")
+    .requiredOption("--format <format>", "Formato: axios, httpx, curl ou fetch")
     .option("--input <directory>", "Diretório com request JSONs")
     .option("--request-id <ids...>", "Exporta apenas request IDs específicos")
     .option("--debug", "Ativa logs detalhados")

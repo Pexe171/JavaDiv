@@ -72,7 +72,7 @@ export const appConfigSchema = z.object({
   redactionRules: z.array(redactionRuleSchema),
   domainFlowDefinitions: z.array(domainFlowDefinitionSchema),
   domainSequenceRules: z.array(domainSequenceRuleSchema),
-  exportFormats: z.array(z.enum(["axios", "httpx", "curl", "markdown"]))
+  exportFormats: z.array(z.enum(["axios", "httpx", "curl", "fetch", "markdown"]))
 });
 
 const keyValueSchema = z.record(z.string(), z.union([z.string(), z.array(z.string())]));

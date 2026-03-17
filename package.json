@@ -1,6 +1,6 @@
 {
   "name": "http-traffic-observability",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "Ferramenta segura para inspeção e auditoria de tráfego HTTP em ambientes autorizados com Playwright + TypeScript.",
   "license": "MIT",
@@ -20,16 +20,20 @@
     "report": "tsx src/index.ts report",
     "tui": "tsx src/index.ts tui ./logs/requests",
     "clear-session": "tsx src/index.ts clear-session",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
     "postinstall": "playwright install chromium"
   },
   "dependencies": {
-    "commander": "latest",
-    "playwright": "latest",
-    "zod": "latest"
+    "commander": "^14.0.3",
+    "playwright": "^1.58.2",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@types/node": "latest",
-    "tsx": "latest",
-    "typescript": "latest"
+    "@types/node": "^25.5.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
   }
 }

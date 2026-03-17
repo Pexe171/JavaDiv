@@ -176,7 +176,7 @@ export const defaultAppConfig: AppConfig = {
     { fromStage: "approval_review", toStage: "contract_signature", maxGapMs: 120000, scoreBoost: 10 },
     { fromStage: "contract_signature", toStage: "finalization", maxGapMs: 90000, scoreBoost: 12 }
   ],
-  exportFormats: ["axios", "httpx", "curl", "markdown"]
+  exportFormats: ["axios", "httpx", "curl", "fetch", "markdown"]
 };
 
 async function readJsonConfig<T>(filePath: string): Promise<T | undefined> {

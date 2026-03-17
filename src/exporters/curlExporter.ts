@@ -4,22 +4,11 @@ import type { AppConfig } from "../types/config";
 import type { ExportArtifact, RequestRecord } from "../types/network";
 import { saveText } from "../storage/saveJson";
 import { stableStringify } from "../utils/json";
+import { buildExportHeaders } from "./shared";
 
 function buildHeaderLines(headers: Record<string, string>): string[] {
-  const lines: string[] = [];
-  for (const [key, value] of Object.entries(headers)) {
-    const normalizedKey = key.toLowerCase();
-    if (normalizedKey.includes("authorization")) {
-      lines.push(`-H "${key}: Bearer <TOKEN>"`);
-    } else if (normalizedKey.includes("cookie")) {
-      lines.push(`-H "${key}: <COOKIE>"`);
-    } else if (normalizedKey.includes("csrf")) {
-      lines.push(`-H "${key}: <CSRF>"`);
-    } else if (["content-type", "accept", "x-requested-with"].includes(normalizedKey)) {
-      lines.push(`-H "${key}: ${value}"`);
-    }
-  }
-  return lines;
+  const sanitized = buildExportHeaders(headers);
+  return Object.entries(sanitized).map(([key, value]) => `-H "${key}: ${value}"`);
 }
 
 function escapeShellPayload(body: unknown): string {

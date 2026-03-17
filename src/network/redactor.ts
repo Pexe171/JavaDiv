@@ -18,7 +18,17 @@ export interface RedactionResult {
 }
 
 export class NetworkRedactor {
-  public constructor(private readonly config: AppConfig) {}
+  private readonly compiledRules: Array<{ pattern: RegExp; replacement: string; applyTo: RedactionTarget }>;
+  private readonly lowerCaseSensitiveFields: string[];
+
+  public constructor(private readonly config: AppConfig) {
+    this.compiledRules = config.redactionRules.map((rule) => ({
+      pattern: new RegExp(rule.keyPattern, "i"),
+      replacement: rule.replacement,
+      applyTo: rule.applyTo
+    }));
+    this.lowerCaseSensitiveFields = config.customSensitiveFields.map((f) => f.toLowerCase());
+  }
 
   public sanitizeHeaders(headers: Record<string, string | undefined>): Record<string, string> {
     return Object.fromEntries(
@@ -212,14 +222,14 @@ export class NetworkRedactor {
 
   private findReplacement(key: string, target: RedactionTarget): string | undefined {
     const normalizedKey = key.toLowerCase();
-    for (const rule of this.config.redactionRules) {
+    for (const rule of this.compiledRules) {
       const appliesToTarget = rule.applyTo === "all" || rule.applyTo === target;
-      if (appliesToTarget && new RegExp(rule.keyPattern, "i").test(normalizedKey)) {
+      if (appliesToTarget && rule.pattern.test(normalizedKey)) {
         return rule.replacement;
       }
     }
 
-    if (this.config.customSensitiveFields.some((field) => normalizedKey.includes(field.toLowerCase()))) {
+    if (this.lowerCaseSensitiveFields.some((field) => normalizedKey.includes(field))) {
       return "***REDACTED***";
     }
 

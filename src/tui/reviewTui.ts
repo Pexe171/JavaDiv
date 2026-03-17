@@ -2,6 +2,7 @@ import readline from "node:readline";
 
 import { exportAxiosArtifacts } from "../exporters/axiosExporter";
 import { exportCurlArtifacts } from "../exporters/curlExporter";
+import { exportFetchArtifacts } from "../exporters/fetchExporter";
 import { exportHttpxArtifacts } from "../exporters/httpxExporter";
 import type { AnalysisWorkspace } from "../cli/workspace";
 import { persistSessionArtifacts, regroupRecords } from "../cli/workspace";
@@ -248,9 +249,9 @@ export class ReviewTui {
       return;
     }
 
-    const selectedFormat = (await this.prompt("Formato de exportação (axios/httpx/curl): ")).trim().toLowerCase() as ExportFormat;
-    if (!["axios", "httpx", "curl"].includes(selectedFormat)) {
-      this.message = "Formato inválido. Use axios, httpx ou curl.";
+    const selectedFormat = (await this.prompt("Formato de exportação (axios/httpx/curl/fetch): ")).trim().toLowerCase() as ExportFormat;
+    if (!["axios", "httpx", "curl", "fetch"].includes(selectedFormat)) {
+      this.message = "Formato inválido. Use axios, httpx, curl ou fetch.";
       return;
     }
 
@@ -258,6 +259,8 @@ export class ReviewTui {
       await exportAxiosArtifacts([record], this.options.config);
     } else if (selectedFormat === "httpx") {
       await exportHttpxArtifacts([record], this.options.config);
+    } else if (selectedFormat === "fetch") {
+      await exportFetchArtifacts([record], this.options.config);
     } else {
       await exportCurlArtifacts([record], this.options.config);
     }

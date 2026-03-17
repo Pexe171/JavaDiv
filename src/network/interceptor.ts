@@ -13,6 +13,9 @@ interface PendingCapture {
   startedAt: number;
 }
 
+const PENDING_TIMEOUT_MS = 120_000;
+const CLEANUP_INTERVAL_MS = 30_000;
+
 export class NetworkInterceptor {
   private readonly pending = new Map<Request, PendingCapture>();
   private readonly records: RequestRecord[] = [];
@@ -20,6 +23,7 @@ export class NetworkInterceptor {
   private readonly parser: RequestParser;
   private readonly classifier: RequestClassifier;
   private readonly flowGrouper: FlowGrouper;
+  private cleanupTimer?: ReturnType<typeof setInterval> | undefined;
   private sequence = 0;
 
   public constructor(
@@ -30,6 +34,29 @@ export class NetworkInterceptor {
     this.parser = new RequestParser(config, redactor);
     this.classifier = new RequestClassifier(config);
     this.flowGrouper = new FlowGrouper(config);
+    this.startCleanupTimer();
+  }
+
+  public dispose(): void {
+    if (this.cleanupTimer) {
+      clearInterval(this.cleanupTimer);
+      this.cleanupTimer = undefined;
+    }
+  }
+
+  private startCleanupTimer(): void {
+    this.cleanupTimer = setInterval(() => this.cleanupStalePending(), CLEANUP_INTERVAL_MS);
+    this.cleanupTimer.unref();
+  }
+
+  private cleanupStalePending(): void {
+    const now = Date.now();
+    for (const [request, pending] of this.pending.entries()) {
+      if (now - pending.startedAt > PENDING_TIMEOUT_MS) {
+        this.logger.debug(`Request pendente expirada após ${PENDING_TIMEOUT_MS}ms: ${pending.parsedRequest.method} ${pending.parsedRequest.pathname}`);
+        this.pending.delete(request);
+      }
+    }
   }
 
   public attachToContext(context: BrowserContext): void {

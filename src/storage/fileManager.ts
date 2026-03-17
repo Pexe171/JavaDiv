@@ -11,6 +11,7 @@ const runtimeDirectories = [
   path.join("exports", "axios"),
   path.join("exports", "httpx"),
   path.join("exports", "curl"),
+  path.join("exports", "fetch"),
   path.join("exports", "markdown")
 ];
 

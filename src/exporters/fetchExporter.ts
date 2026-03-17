@@ -6,58 +6,39 @@ import { saveText } from "../storage/saveJson";
 import { stableStringify } from "../utils/json";
 import { buildExportHeaders } from "./shared";
 
-function buildPayload(body: unknown): string {
-  if (body === null || body === undefined) {
-    return "undefined";
-  }
-  return stableStringify(body);
-}
-
 const methodsWithoutBody = new Set(["GET", "HEAD", "OPTIONS"]);
 
-function buildAxiosSnippet(record: RequestRecord): string {
+function buildFetchSnippet(record: RequestRecord): string {
   const url = new URL(record.request.url);
-  const method = record.request.method.toLowerCase();
   const headers = stableStringify(buildExportHeaders(record.request.headers));
   const requestPath = `${url.pathname}${url.search}`;
+  const hasBody = !methodsWithoutBody.has(record.request.method) && record.request.body != null;
 
-  if (methodsWithoutBody.has(record.request.method)) {
-    return `import axios from "axios";
+  const bodyLine = hasBody ? `  body: JSON.stringify(${stableStringify(record.request.body)}),\n` : "";
 
-await axios.${method}(
+  return `const response = await fetch(
   \`<BASE_URL>${requestPath}\`,
   {
-    headers: ${headers}
-  }
+    method: "${record.request.method}",
+    headers: ${headers},
+${bodyLine}  }
 );
-`;
-  }
 
-  const payload = buildPayload(record.request.body);
-  return `import axios from "axios";
-
-const payload = ${payload};
-
-await axios.${method}(
-  \`<BASE_URL>${requestPath}\`,
-  payload,
-  {
-    headers: ${headers}
-  }
-);
+const data = await response.json();
+console.log(response.status, data);
 `;
 }
 
-export async function exportAxiosArtifacts(records: RequestRecord[], config: AppConfig): Promise<ExportArtifact[]> {
-  const outputDir = path.join(config.outputDirectory, "exports", "axios");
+export async function exportFetchArtifacts(records: RequestRecord[], config: AppConfig): Promise<ExportArtifact[]> {
+  const outputDir = path.join(config.outputDirectory, "exports", "fetch");
   const artifacts: ExportArtifact[] = [];
 
   for (const record of records) {
-    const snippet = buildAxiosSnippet(record);
+    const snippet = buildFetchSnippet(record);
     const filePath = path.join(outputDir, `request-${record.request.id}.ts`);
     await saveText(filePath, snippet);
     artifacts.push({
-      format: "axios",
+      format: "fetch",
       filePath,
       requestId: record.request.id,
       content: snippet

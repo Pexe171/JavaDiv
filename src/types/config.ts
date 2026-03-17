@@ -1,4 +1,4 @@
-export type ExportFormat = "axios" | "httpx" | "curl" | "markdown";
+export type ExportFormat = "axios" | "httpx" | "curl" | "fetch" | "markdown";
 export type RedactionTarget = "headers" | "body" | "query" | "all";
 
 export interface DomainFlowDefinition {

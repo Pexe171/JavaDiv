@@ -113,6 +113,40 @@ export class NetworkRedactor {
     };
   }
 
+  public redactStructured(
+    value: unknown,
+    target: Exclude<RedactionTarget, "all">,
+    previewLimit: number,
+    maxBytesToStore: number
+  ): RedactionResult {
+    const sanitized = this.sanitizeUnknown(value, undefined, target);
+    const serialized = typeof sanitized === "string" ? sanitized : stableStringify(sanitized);
+    const initialSize = byteLength(serialized);
+    const preview = truncateString(serialized, previewLimit);
+
+    if (initialSize > maxBytesToStore) {
+      return {
+        data: {
+          truncated: true,
+          approxBytes: initialSize,
+          preview: preview.value
+        },
+        preview: preview.value,
+        truncated: true,
+        notes: [`Body truncated from ${initialSize} bytes.`],
+        sizeBytes: initialSize
+      };
+    }
+
+    return {
+      data: sanitized,
+      preview: preview.value,
+      truncated: preview.truncated,
+      notes: [],
+      sizeBytes: initialSize
+    };
+  }
+
   private redactBinaryBody(rawBody: Buffer, contentType: string | undefined, previewLimit: number): RedactionResult {
     const description = `${contentType ?? "binary"} payload omitted (${rawBody.byteLength} bytes)`;
     const preview = truncateString(description, previewLimit);

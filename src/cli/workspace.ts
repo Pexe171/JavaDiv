@@ -2,6 +2,7 @@ import path from "node:path";
 
 import { flowGroupSchema, requestRecordSchema } from "../config/schema";
 import { buildSessionSummary, saveJsonSummary, saveMarkdownSummary, type SessionSummary } from "../exporters/markdownReporter";
+import { NetworkRedactor } from "../network/redactor";
 import { RequestClassifier } from "../network/requestClassifier";
 import { FlowGrouper } from "../network/flowGrouper";
 import { listJsonFiles, readJsonFile, toAbsolutePath } from "../storage/fileManager";
@@ -42,9 +43,45 @@ export function regroupRecords(records: RequestRecord[], config: AppConfig): { r
   return new FlowGrouper(config).group(records);
 }
 
+export function resanitizeRecords(records: RequestRecord[], config: AppConfig): RequestRecord[] {
+  const redactor = new NetworkRedactor(config);
+
+  return records.map((record) => {
+    const requestBody = redactor.redactStructured(record.request.body, "body", config.requestBodyPreviewLimit, config.maxBodyBytesToStore);
+    const responseBody = record.response
+      ? redactor.redactStructured(record.response.body, "body", config.responseBodyPreviewLimit, config.maxBodyBytesToStore)
+      : undefined;
+
+    return {
+      ...record,
+      request: {
+        ...record.request,
+        headers: redactor.sanitizeHeaders(record.request.headers),
+        queryParams: redactor.sanitizeQuery(record.request.queryParams),
+        body: requestBody.data,
+        bodyPreview: requestBody.preview,
+        bodyTruncated: requestBody.truncated
+      },
+      response: record.response
+        ? {
+            ...record.response,
+            headers: redactor.sanitizeHeaders(record.response.headers),
+            body: responseBody?.data ?? record.response.body,
+            bodyPreview: responseBody?.preview ?? record.response.bodyPreview,
+            bodyTruncated: responseBody?.truncated ?? record.response.bodyTruncated
+          }
+        : undefined,
+      notes: [...record.notes],
+      scoreReasons: [...record.scoreReasons],
+      autoObservations: [...record.autoObservations],
+      domainSignals: [...record.domainSignals]
+    };
+  });
+}
+
 export function reclassifyRecords(records: RequestRecord[], config: AppConfig): RequestRecord[] {
   const classifier = new RequestClassifier(config);
-  const sorted = [...records].sort((left, right) => left.request.sequence - right.request.sequence);
+  const sorted = resanitizeRecords(records, config).sort((left, right) => left.request.sequence - right.request.sequence);
   const reclassified: RequestRecord[] = [];
 
   for (const record of sorted) {

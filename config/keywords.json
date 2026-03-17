@@ -1,0 +1,19 @@
+{
+  "relevanceKeywords": [
+    "create",
+    "submit",
+    "update",
+    "save",
+    "simulation",
+    "proposal",
+    "proposta",
+    "credit",
+    "contract",
+    "customer",
+    "validate",
+    "approval"
+  ],
+  "mediumThreshold": 40,
+  "highThreshold": 70,
+  "flowTimeWindowMs": 12000
+}

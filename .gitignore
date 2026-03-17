@@ -1,5 +1,10 @@
-target/
-.idea/
-.vscode/
-*.iml
-.env
+node_modules/
+dist/
+logs/**/*.json
+logs/**/*.md
+logs/**/*.ts
+logs/**/*.py
+logs/**/*.sh
+sessions/*.json
+.DS_Store
+coverage/

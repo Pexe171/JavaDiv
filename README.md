@@ -1,291 +1,351 @@
-# Lives Mailer (JavaDiv)
+# HTTP Traffic Observability
 
-API para gestão e envio de campanhas de e-mail para inscritos em lives, com foco em consentimento, descadastro e histórico por destinatário.
+Ferramenta desktop/CLI em **Node.js + TypeScript + Playwright** para **inspeção, auditoria e análise de tráfego HTTP** de aplicações web em **ambientes autorizados** de desenvolvimento, homologação ou staging.
 
-## Stack e arquitetura
+## Visão geral
 
-- **Java 21**
-- **Spring Boot 3**
-- Spring Web
-- Spring Data JPA
-- Bean Validation
-- Scheduler para envio agendado
-- PostgreSQL
-- JavaMailSender (SMTP)
-- Arquitetura em camadas:
-  - `controller`: endpoints REST
-  - `service`: regras de negócio
-  - `repository`: acesso a dados
-  - `domain`: entidades e enums
-  - `dto`: contratos de entrada/saída
+O projeto abre o Chromium em modo visível, permite **login manual**, observa requests **fetch/xhr**, aplica **sanitização obrigatória** antes de persistir qualquer dado e gera artefatos estruturados para:
 
-## Decisões de design
+- troubleshooting legítimo;
+- entendimento de fluxos funcionais;
+- documentação técnica;
+- preparação de testes;
+- geração segura de stubs de integração.
 
-1. **Separação de responsabilidades**: cada camada trata somente da sua função para facilitar manutenção.
-2. **Controle de consentimento e opt-out**: seleção de destinatários considera apenas quem deu consentimento e não se descadastrou.
-3. **Histórico de envio por contato/campanha**: tabela `campaign_recipients` registra `PENDING`, `SENT` e `FAILED`.
-4. **Não duplicidade**: constraint única `(campaign_id, contact_id)` + checagem de existência antes do envio.
-5. **Rate limit por lote**: envio em lotes configuráveis por variáveis de ambiente (`MAIL_BATCH_SIZE`, `MAIL_BATCH_INTERVAL_SECONDS`).
-6. **Pronto para evolução**: serviço de envio isolado, facilitando troca futura para filas (RabbitMQ/SQS).
+> Escopo de segurança: esta ferramenta foi desenhada apenas para uso autorizado. Ela **não** faz bypass de autenticação, **não** persiste segredos brutos e **não** executa replay automático contra produção.
 
-## Regras de negócio implementadas
-
-- ✅ Só envia e-mail para contato com `consentimento=true`.
-- ✅ Contato com e-mail inválido não é aceito (Bean Validation no DTO).
-- ✅ Não envia e-mail duplicado para mesmo contato na mesma campanha.
-- ✅ Registra histórico por destinatário (`PENDING`, `SENT`, `FAILED`).
-- ✅ Permite descadastro via token único.
-- ✅ Contato descadastrado nunca recebe novas campanhas.
-
-## Estrutura de endpoints
-
-- `POST /api/contacts`
-- `GET /api/contacts`
-- `POST /api/contacts/import-lines` (texto puro com 1 e-mail por linha)
-- `POST /api/campaigns`
-- `POST /api/campaigns/{id}/schedule`
-- `POST /api/campaigns/{id}/send-now`
-- `GET /api/campaigns/{id}/status`
-- `GET /api/campaigns/config`
-- `PUT /api/campaigns/config`
-- `GET /api/unsubscribe/{token}`
-
-## Configuração via `.env`
-
-Copie o arquivo de exemplo:
-
-```bash
-cp .env.example .env
-```
-
-Variáveis esperadas:
-
-```env
-APP_PORT=8080
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=lives_mailer
-DB_USER=postgres
-DB_PASS=postgres
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=seu_email@gmail.com
-SMTP_PASS=sua_senha_de_app
-SMTP_FROM="Seu Canal <seu_email@gmail.com>"
-MAIL_BATCH_SIZE=50
-MAIL_BATCH_INTERVAL_SECONDS=60
-```
-
-> Dica: use `source .env` antes de rodar a aplicação no terminal.
-
-
-### Erro comum: `UnknownHostException: "smtp.gmail.com"`
-
-Se o log mostrar o host SMTP com aspas (por exemplo `"smtp.gmail.com"`), o DNS tenta resolver o valor **com as aspas** e a conexão falha.
-
-A aplicação agora sanitiza automaticamente aspas externas nas propriedades SMTP (`host`, `username`, `password` e `protocol`) para evitar esse problema em ambientes onde variáveis chegam com aspas extras.
-
-Mesmo com essa proteção, prefira definir no `.env` sem aspas no host:
-
-```env
-SMTP_HOST=smtp.gmail.com
-```
-
-Se você usar **porta 465**, o SMTP normalmente exige SSL implícito. A aplicação agora ativa automaticamente:
-
-- `mail.smtp.ssl.enable=true`
-- `mail.smtp.starttls.enable=false`
-
-quando detectar porta `465` e nenhuma dessas flags definida manualmente.
-
-Se quiser controlar manualmente TLS/SSL, basta definir `spring.mail.properties.*` nas variáveis de ambiente.
-
-## Setup local
-
-### 1) Banco de dados
-
-Crie o banco e aplique schema:
-
-```bash
-psql -U postgres -f src/main/resources/db/init.sql
-psql -U postgres -d lives_mailer -f src/main/resources/schema.sql
-```
-
-### 2) Build e execução
-
-```bash
-mvn clean test
-mvn spring-boot:run
-```
-
-## Exemplos de uso
-
-Arquivo com cURLs: [`examples-curl.sh`](examples-curl.sh).
-
-Rodar:
-
-```bash
-chmod +x examples-curl.sh
-./examples-curl.sh
-```
-
-Exemplo rápido de importação por linhas:
-
-```bash
-curl -X POST "http://localhost:8080/api/contacts/import-lines" \
-  -H "Content-Type: text/plain" \
-  --data-binary $'email1@dominio.com\nemail2@dominio.com\nEmailInvalido\n'
-```
-
-O endpoint:
-- converte e-mails para minúsculo;
-- ignora linhas vazias;
-- ignora e-mails inválidos;
-- ignora duplicados no payload e já existentes no banco;
-- cria contato com `nome` baseado no prefixo do e-mail e `consentimento=true`, `inscritoLives=true`.
-
-## Tratamento de erros
-
-A API possui `@RestControllerAdvice` com respostas padronizadas para:
-
-- validação (`400`)
-- regra de negócio (`400`)
-- não encontrado (`404`)
-- erro interno (`500`)
-
-## Logs estruturados
-
-No envio de e-mails, o sistema registra:
-
-- campanha
-- contato
-- e-mail destino
-- status (sucesso/erro)
-
-Formato exemplo:
+## Árvore de arquivos
 
 ```text
-mail_send status=success campaignId=1 contactId=10 email=ana@email.com
+.
+├── README.md
+├── package.json
+├── tsconfig.json
+├── .gitignore
+├── config/
+│   ├── filters.json
+│   ├── keywords.json
+│   └── redaction.json
+├── examples/
+│   └── minimal-run.sh
+├── logs/
+│   ├── sessions/
+│   ├── requests/
+│   ├── flows/
+│   ├── reports/
+│   └── exports/
+│       ├── axios/
+│       ├── httpx/
+│       ├── curl/
+│       └── markdown/
+├── sessions/
+└── src/
+    ├── browser/
+    │   ├── initBrowser.ts
+    │   └── sessionManager.ts
+    ├── cli/
+    │   ├── args.ts
+    │   └── commands.ts
+    ├── config/
+    │   ├── defaultConfig.ts
+    │   └── schema.ts
+    ├── exporters/
+    │   ├── axiosExporter.ts
+    │   ├── curlExporter.ts
+    │   ├── httpxExporter.ts
+    │   └── markdownReporter.ts
+    ├── network/
+    │   ├── flowGrouper.ts
+    │   ├── interceptor.ts
+    │   ├── redactor.ts
+    │   ├── requestClassifier.ts
+    │   └── requestParser.ts
+    ├── storage/
+    │   ├── fileManager.ts
+    │   └── saveJson.ts
+    ├── types/
+    │   ├── config.ts
+    │   ├── flow.ts
+    │   └── network.ts
+    ├── utils/
+    │   ├── errors.ts
+    │   ├── json.ts
+    │   ├── logger.ts
+    │   └── time.ts
+    └── index.ts
 ```
 
-## Testes unitários
+## Arquitetura
 
-Inclui testes de serviços para regras críticas:
+### 1. Camada de navegador
+- `browser/initBrowser.ts`: sobe o Chromium com `headless: false`.
+- `browser/sessionManager.ts`: restaura/salva `storageState` em `/sessions` e detecta expiração básica por cookies persistidos.
 
-- envio e histórico de campanha
-- falha de envio e status `FAILED`
-- descadastro por token
-- reaproveitamento de token existente
+### 2. Camada de rede
+- `network/requestParser.ts`: filtra fetch/xhr relevantes, normaliza request/response e extrai dados estruturados.
+- `network/redactor.ts`: aplica mascaramento obrigatório antes de qualquer persistência.
+- `network/requestClassifier.ts`: faz scoring LOW/MEDIUM/HIGH configurável por heurística.
+- `network/flowGrouper.ts`: agrupa requests por janela temporal, rota ativa e semântica inferida.
+- `network/interceptor.ts`: conecta tudo em runtime e imprime feedback no terminal em tempo real.
 
-## Boas práticas anti-spam e LGPD
+### 3. Camada de persistência
+- `storage/saveJson.ts`: grava JSON/texto com escrita temporária e rename.
+- `storage/fileManager.ts`: garante diretórios, leitura de artefatos e suporte a caminhos.
 
-1. Envie apenas para contatos com consentimento explícito.
-2. Mantenha opção clara de descadastro em todas as campanhas.
-3. Registre quando e como o consentimento foi coletado (futuro incremento recomendado).
-4. Evite excesso de frequência de envios para proteger reputação do domínio.
-5. Monitore bounce/complaints para higienização de base (evolução futura).
-6. Não armazene segredos em código; use variáveis de ambiente.
+### 4. Camada de exportação e relatório
+- `exporters/*.ts`: gera snippets seguros para Axios, HTTPX, cURL e sumário Markdown.
 
----
+### 5. Camada de CLI
+- `cli/commands.ts`: orquestra `start`, `analyze`, `export`, `report` e `clear-session`.
 
-Projeto preparado para evolução com filas (RabbitMQ/SQS) sem quebrar a camada de API.
+## Instalação
 
+### Requisitos
+- Node.js 20+
+- npm 10+
+- ambiente autorizado para observar a aplicação
 
-### Configuração de CORS (Back-end)
-
-A API já está preparada com `WebConfig` para aceitar requisições do front-end em:
-
-- `http://localhost:3000`
-
-Mapeamento aplicado para rotas `/api/**`, incluindo métodos `GET`, `POST`, `PUT`, `PATCH`, `DELETE` e `OPTIONS`.
-
-### Front-end (Next.js + Tailwind CSS)
-
-O módulo web em `frontend/` foi simplificado para um fluxo de disparo rápido:
-
-- Interface minimalista e chamativa para **envio de e-mail de live no TikTok**
-- Bloco de **importação de contatos** com colagem em massa (1 e-mail por linha)
-- Tratamento inteligente da importação: em entradas como `email@dominio.com:dados`, o sistema considera apenas o trecho antes de `:`
-- Contador em tempo real com total de e-mails únicos identificados para importação
-- Formulário com **apenas 1 campo**: link da live
-- Geração automática de campanha com:
-  - título padrão com data atual
-  - assunto padrão para chamada de live ao vivo
-  - HTML de e-mail pré-pronto com botão **"Clique aqui para assistir"**
-- Disparo imediato logo após criação, usando `POST /api/campaigns` + `POST /api/campaigns/{id}/send-now`
-- Disparo imediato **assíncrono**: a API responde rápido e o processamento segue em segundo plano
-- Prévia visual do botão para validar rapidamente o link informado
-- Mensagens claras de sucesso/erro na própria tela
-- Monitoramento automático do status da campanha via `GET /api/campaigns/{id}/status`
-- Painel com totais de `SENT`, `FAILED`, `PENDING`
-- Lista dos últimos e-mails enviados com sucesso e logs de erro detalhados (e-mail + mensagem retornada)
-- Aviso visual quando a campanha termina com `0` envios e `0` falhas (cenário típico de base sem contatos elegíveis)
-
-#### Executar front-end
+### Passos
 
 ```bash
-cd frontend
 npm install
-npm run dev
+npm run build
 ```
 
-A aplicação sobe em `http://localhost:3000` e por padrão aponta para `http://localhost:8080`.
+O `postinstall` executa `playwright install chromium` para garantir o browser do Playwright.
 
-Se necessário, ajuste via variável:
+## Comandos
+
+### Iniciar captura com navegador visível
 
 ```bash
-NEXT_PUBLIC_API_URL=http://localhost:8080
+npm run dev -- start --target https://seu-ambiente-autorizado.local --profile staging
 ```
 
-
-## Execução com Docker
-
-Antes de subir a aplicação, garanta que o container do banco (`pg-lives`) esteja em execução.
-
-### Build da imagem
+Opções úteis:
 
 ```bash
-docker build -t javadiv-app .
+npm run dev -- start --target https://seu-ambiente.local --debug
+npm run dev -- start --target https://seu-ambiente.local --clear-session
+npm run dev -- start --target https://seu-ambiente.local --profile qa
 ```
 
-### Subir o container da aplicação
+Durante a execução:
+1. o Chromium abre visível;
+2. você faz login manualmente;
+3. o terminal mostra requests relevantes em tempo real;
+4. finalize com `Ctrl+C` para persistir sessão e artefatos.
+
+### Analisar requests já salvas
 
 ```bash
-docker run -p 8080:8080 --name javadiv-container --network="host" javadiv-app
+npm run dev -- analyze ./logs/requests
 ```
 
-> Se optar por execução local sem Docker, mantenha o Java 21 instalado e configurado no terminal.
+Com marcação manual:
 
+```bash
+npm run dev -- analyze ./logs/requests   --important 11111111-1111-1111-1111-111111111111   --note 11111111-1111-1111-1111-111111111111:submissao-critica   --rename-flow flow-2-proposal-submit:proposal-confirmation
+```
 
-## Diagnóstico rápido: "campanha disparada com sucesso", mas e-mail não chega
+### Exportar stubs seguros
 
-Se a campanha foi iniciada, porém você não recebeu e-mail e não viu erro claro, valide nesta ordem:
+```bash
+npm run dev -- export --format axios
+npm run dev -- export --format httpx
+npm run dev -- export --format curl
+```
 
-1. **Status da campanha**
-   - Consulte `GET /api/campaigns/{id}/status`.
-   - Se retornar `sent=0`, `failed=0` e `pending=0`, a campanha finalizou sem destinatários elegíveis.
+Filtrando por request específica:
 
-2. **Elegibilidade dos contatos**
-   - O disparo só considera contatos com:
-     - `consentimento=true`
-     - `inscritoLives=true`
-     - `unsubscribedAt=null`
+```bash
+npm run dev -- export --format axios --request-id 11111111-1111-1111-1111-111111111111
+```
 
-3. **Logs de processamento (back-end)**
-   - Agora o serviço registra logs estruturados de início e fim do disparo, incluindo total elegível e resumo final.
-   - Em falhas de envio, também registra `campaignId`, `contactId`, `email` e motivo.
+### Gerar relatório
 
-Exemplo de logs esperados:
+```bash
+npm run dev -- report
+npm run dev -- report ./logs/requests
+```
+
+### Limpar sessão persistida
+
+```bash
+npm run dev -- clear-session
+npm run dev -- clear-session --profile staging
+```
+
+## Estrutura de saída
+
+A aplicação gera artefatos sanitizados em:
+
+- `logs/requests/request-<id>.json`
+- `logs/flows/flow-<session>-<ordem>-<nome>.json`
+- `logs/reports/session-<timestamp>.json`
+- `logs/exports/markdown/session-<timestamp>.md`
+- `logs/exports/axios/request-<id>.ts`
+- `logs/exports/httpx/request-<id>.py`
+- `logs/exports/curl/request-<id>.sh`
+- `logs/sessions/session-<timestamp>.json`
+- `sessions/<profile>.json` para `storageState`
+
+## Console em tempo real
+
+Formato padrão:
 
 ```text
-campaign_dispatch status=started campaignId=12 eligibleContacts=150
-campaign_dispatch status=finished campaignId=12 processed=150 sent=148 failed=2
+[HIGH] POST /api/proposal/create -> 201 in 428ms [flow: proposal-submit]
 ```
 
-Exemplo quando não há base elegível:
+Com `--debug`, o terminal também mostra:
+- preview sanitizado do payload;
+- preview sanitizado da resposta;
+- razões do score;
+- motivos de ignore para requests filtradas.
 
-```text
-campaign_dispatch status=started campaignId=13 eligibleContacts=0
-campaign_dispatch status=no_eligible_contacts campaignId=13
-campaign_dispatch status=finished campaignId=13 processed=0 sent=0 failed=0
+## Política de segurança
+
+### O que a ferramenta faz
+- captura tráfego de rede autorizado;
+- persiste somente dados redigidos;
+- gera artefatos para QA, troubleshooting e integração legítima.
+
+### O que a ferramenta não faz
+- bypass de autenticação;
+- evasão/stealth/fingerprint spoofing;
+- replay automático de requests autenticadas;
+- persistência de tokens/cookies reais em JSON;
+- uso em produção sem autorização explícita.
+
+## Como funciona a sanitização
+
+A sanitização acontece **antes** de salvar qualquer request/response.
+
+Itens mascarados por padrão:
+- `Authorization`
+- `Cookie`
+- `Set-Cookie`
+- `csrf`
+- `token`
+- `password`
+- `cpf`
+- `email`
+- telefones detectáveis
+- padrões típicos de bearer/basic token
+
+Exemplos:
+
+```json
+{
+  "authorization": "Bearer ***REDACTED***",
+  "cookie": "***REDACTED***",
+  "cpf": "***REDACTED***"
+}
 ```
+
+### Configurando redaction customizada
+
+Edite `config/redaction.json`:
+
+```json
+{
+  "customSensitiveFields": ["customerDocument", "motherName"],
+  "rules": [
+    {
+      "keyPattern": "customerDocument",
+      "replacement": "***REDACTED***",
+      "applyTo": "body"
+    }
+  ]
+}
+```
+
+## Configuração
+
+### `config/filters.json`
+Controla allowlist e ruído irrelevante.
+
+### `config/keywords.json`
+Controla palavras-chave de relevância, thresholds e janela temporal dos fluxos.
+
+### `config/redaction.json`
+Controla campos sensíveis e regras adicionais de mascaramento.
+
+## Como usar em ambiente autorizado
+
+1. aponte para um domínio controlado por você;
+2. faça login manualmente;
+3. execute apenas em dev/homolog/staging;
+4. revise `filters.json` e `redaction.json` antes de capturar;
+5. trate os artefatos gerados como material técnico sanitizado.
+
+## Como interpretar os relatórios
+
+O sumário JSON/Markdown traz:
+- total de requests observadas;
+- total de requests relevantes;
+- endpoints mais frequentes;
+- endpoints mutáveis mais frequentes;
+- fluxos detectados;
+- requests HIGH;
+- falhas HTTP;
+- ações de usuário inferidas;
+- lista de arquivos gerados.
+
+## Exemplo mínimo executável
+
+Arquivo: `examples/minimal-run.sh`
+
+```bash
+chmod +x ./examples/minimal-run.sh
+./examples/minimal-run.sh
+```
+
+Esse script:
+1. instala dependências;
+2. compila o projeto;
+3. abre o Chromium visível apontando para `https://example.com`.
+
+## Decisões arquiteturais
+
+### Regras simples primeiro
+A classificação usa heurísticas transparentes em vez de inferência opaca. O trade-off é perder sofisticação estatística, mas ganhar previsibilidade e facilidade de ajuste por arquivo.
+
+### Redação centralizada
+A sanitização fica concentrada em `network/redactor.ts`. Isso reduz o risco de um módulo futuro esquecer de mascarar campos antes da persistência.
+
+### Sessão por perfil
+O `storageState` é salvo por perfil (`default`, `staging`, `qa` etc.). O trade-off é manter arquivos extras em `/sessions`, mas melhora isolamento entre ambientes autorizados.
+
+### Agrupamento heurístico
+Os fluxos são inferidos por janela temporal + rota + palavras-chave. É uma aproximação robusta para troubleshooting, embora não substitua instrumentação de negócio explícita.
+
+## Limitações conhecidas
+
+- detecção de expiração de sessão é heurística e baseada em cookies persistidos;
+- o campo `initiator` é aproximado a partir de frame/page;
+- ações manuais do usuário são inferidas, não rastreadas diretamente do DOM;
+- respostas binárias são resumidas em vez de persistidas integralmente;
+- `GET` é capturada apenas quando combina com palavras-chave configuradas.
+
+## Critérios de aceite cobertos
+
+- compilação TypeScript estrita;
+- CLI com os comandos solicitados;
+- Chromium visível via Playwright;
+- interceptação de fetch/xhr relevantes;
+- persistência estruturada em JSON;
+- mascaramento obrigatório antes de salvar;
+- agrupamento por fluxo funcional;
+- exportadores seguros;
+- README completo;
+- exemplo mínimo executável.
+
+## Próximos passos recomendados
+
+1. adicionar testes automatizados unitários para `redactor`, `classifier` e `flowGrouper`;
+2. enriquecer inferência de fluxo com eventos explícitos de navegação e formulário;
+3. adicionar suporte opcional a exportação OpenAPI-like a partir dos artefatos sanitizados;
+4. incluir interface TUI para renomear fluxos e marcar requests importantes sem depender de flags;
+5. criar snapshots de sessão para comparar ambientes homolog/staging.

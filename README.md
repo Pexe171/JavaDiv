@@ -14,6 +14,23 @@ O projeto abre o Chromium em modo visível, permite **login manual**, observa re
 
 > Escopo de segurança: esta ferramenta foi desenhada apenas para uso autorizado. Ela **não** faz bypass de autenticação, **não** persiste segredos brutos e **não** executa replay automático contra produção.
 
+## Changelog (v0.2.0)
+
+### Correções
+- **Axios exporter**: corrigido bug onde requests GET enviavam body como segundo argumento (comportamento incorreto para `axios.get`)
+- **HTTPX exporter**: conversão de literais Python mais robusta usando replacer de JSON nativo
+
+### Novos recursos
+- **Fetch API exporter**: novo formato de exportação usando `fetch()` nativo (`--format fetch`)
+- **86 testes unitários**: cobertura abrangente com Vitest para redactor, classifier, flowGrouper, domainHeuristics, utils e exporters
+- **Cleanup de requests pendentes**: interceptor agora limpa automaticamente requests que ficam pendentes por mais de 120s
+
+### Melhorias
+- **Versões de dependências fixadas**: substituídas todas as referências `latest` por versões semânticas específicas
+- **Cache de RegExp no redactor**: regras de redação são compiladas uma vez no construtor em vez de recompilar a cada verificação
+- **Headers de exportação compartilhados**: lógica `buildExportHeaders` extraída para módulo compartilhado (DRY entre exporters)
+- **Scripts de teste**: adicionados `test`, `test:watch` e `test:coverage` ao package.json
+
 ## Árvore de arquivos
 
 ```text
@@ -21,6 +38,7 @@ O projeto abre o Chromium em modo visível, permite **login manual**, observa re
 ├── README.md
 ├── package.json
 ├── tsconfig.json
+├── vitest.config.ts
 ├── .gitignore
 ├── config/
 │   ├── filters.json
@@ -28,6 +46,13 @@ O projeto abre o Chromium em modo visível, permite **login manual**, observa re
 │   └── redaction.json
 ├── examples/
 │   └── minimal-run.sh
+├── tests/
+│   ├── domainHeuristics.test.ts
+│   ├── exporters.test.ts
+│   ├── flowGrouper.test.ts
+│   ├── redactor.test.ts
+│   ├── requestClassifier.test.ts
+│   └── utils.test.ts
 ├── logs/
 │   ├── sessions/
 │   ├── requests/
@@ -37,6 +62,7 @@ O projeto abre o Chromium em modo visível, permite **login manual**, observa re
 │       ├── axios/
 │       ├── httpx/
 │       ├── curl/
+│       ├── fetch/
 │       └── markdown/
 ├── sessions/
 └── src/
@@ -45,16 +71,20 @@ O projeto abre o Chromium em modo visível, permite **login manual**, observa re
     │   └── sessionManager.ts
     ├── cli/
     │   ├── args.ts
-    │   └── commands.ts
+    │   ├── commands.ts
+    │   └── workspace.ts
     ├── config/
     │   ├── defaultConfig.ts
     │   └── schema.ts
     ├── exporters/
     │   ├── axiosExporter.ts
     │   ├── curlExporter.ts
+    │   ├── fetchExporter.ts
     │   ├── httpxExporter.ts
-    │   └── markdownReporter.ts
+    │   ├── markdownReporter.ts
+    │   └── shared.ts
     ├── network/
+    │   ├── domainHeuristics.ts
     │   ├── flowGrouper.ts
     │   ├── interceptor.ts
     │   ├── redactor.ts
@@ -96,7 +126,8 @@ O projeto abre o Chromium em modo visível, permite **login manual**, observa re
 - `storage/fileManager.ts`: garante diretórios, leitura de artefatos e suporte a caminhos.
 
 ### 4. Camada de exportação e relatório
-- `exporters/*.ts`: gera snippets seguros para Axios, HTTPX, cURL e sumário Markdown.
+- `exporters/*.ts`: gera snippets seguros para Axios, HTTPX, cURL, Fetch API e sumário Markdown.
+- `exporters/shared.ts`: lógica compartilhada de construção de headers para exportação.
 
 ### 5. Camada de CLI
 - `cli/commands.ts`: orquestra `start`, `analyze`, `export`, `report` e `clear-session`.
@@ -159,6 +190,7 @@ npm run dev -- analyze ./logs/requests   --important 11111111-1111-1111-1111-111
 npm run dev -- export --format axios
 npm run dev -- export --format httpx
 npm run dev -- export --format curl
+npm run dev -- export --format fetch
 ```
 
 ### Abrir a TUI interativa
@@ -176,7 +208,7 @@ Atalhos principais:
 - `n`: adiciona nota à request selecionada
 - `r`: renomeia o flow selecionado
 - `g`: reaplica as heurísticas refinadas de agrupamento
-- `e`: exporta a request atual em axios/httpx/curl
+- `e`: exporta a request atual em axios/httpx/curl/fetch
 - `s`: salva os artefatos revisados
 - `q`: sai da TUI
 
@@ -211,6 +243,7 @@ A aplicação gera artefatos sanitizados em:
 - `logs/exports/axios/request-<id>.ts`
 - `logs/exports/httpx/request-<id>.py`
 - `logs/exports/curl/request-<id>.sh`
+- `logs/exports/fetch/request-<id>.ts`
 - `logs/sessions/session-<timestamp>.json`
 - `sessions/<profile>.json` para `storageState`
 
@@ -384,14 +417,34 @@ Os fluxos são inferidos por janela temporal + rota + palavras-chave + estágios
 - persistência estruturada em JSON;
 - mascaramento obrigatório antes de salvar;
 - agrupamento por fluxo funcional;
-- exportadores seguros;
+- exportadores seguros (Axios, HTTPX, cURL, Fetch, Markdown);
+- 86 testes unitários automatizados com Vitest;
+- versões de dependências fixadas;
 - README completo;
 - exemplo mínimo executável.
 
+## Testes
+
+O projeto conta com **86 testes unitários** escritos com [Vitest](https://vitest.dev/):
+
+```bash
+npm test              # roda todos os testes uma vez
+npm run test:watch    # roda em modo watch
+npm run test:coverage # roda com relatório de cobertura
+```
+
+Módulos com cobertura de teste:
+- `network/redactor.ts`: sanitização de headers, query, body, truncamento, padrões PII
+- `network/requestClassifier.ts`: scoring, keywords, domain match, burst, sequência
+- `network/flowGrouper.ts`: agrupamento temporal, estatísticas, relevância, reset
+- `network/domainHeuristics.ts`: detecção de domínio, sequência, ranking
+- `utils/*.ts`: todas as funções utilitárias
+- `exporters/shared.ts`: builder de headers de exportação
+- `cli/args.ts`: parsing de argumentos
+
 ## Próximos passos recomendados
 
-1. adicionar testes automatizados unitários para `redactor`, `classifier` e `flowGrouper`;
-2. enriquecer inferência de fluxo com eventos explícitos de navegação e formulário;
-3. adicionar suporte opcional a exportação OpenAPI-like a partir dos artefatos sanitizados;
-4. incluir interface TUI para renomear fluxos e marcar requests importantes sem depender de flags;
-5. criar snapshots de sessão para comparar ambientes homolog/staging.
+1. enriquecer inferência de fluxo com eventos explícitos de navegação e formulário;
+2. adicionar suporte opcional a exportação OpenAPI-like a partir dos artefatos sanitizados;
+3. criar snapshots de sessão para comparar ambientes homolog/staging;
+4. adicionar testes de integração end-to-end com Playwright fixtures.

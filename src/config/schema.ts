@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+const confidenceSchema = z.number().min(0).max(1);
+
 export const redactionRuleSchema = z.object({
   keyPattern: z.string().min(1),
   replacement: z.string().min(1),
@@ -27,6 +29,48 @@ export const domainSequenceRuleSchema = z.object({
   toStage: z.string().min(1),
   maxGapMs: z.number().int().min(1).default(15000),
   scoreBoost: z.number().int().min(0).default(0)
+});
+
+
+const parameterCandidateSchema = z.object({
+  path: z.string().min(1),
+  suggestedName: z.string().min(1),
+  sampleValue: z.string(),
+  valueType: z.enum(["string", "number", "boolean", "currency", "date", "document", "identifier", "unknown"]),
+  confidence: confidenceSchema,
+  reason: z.string().min(1),
+  enabled: z.boolean()
+});
+
+const extractionCandidateSchema = z.object({
+  key: z.string().min(1),
+  label: z.string().min(1),
+  sampleValue: z.string(),
+  strategy: z.enum(["json-path", "regex"]),
+  selector: z.string().min(1),
+  valueType: z.enum(["string", "number", "currency", "date", "boolean", "unknown"]),
+  confidence: confidenceSchema,
+  reason: z.string().min(1),
+  enabled: z.boolean()
+});
+
+const automationPlanSchema = z.object({
+  functionName: z.string().min(1),
+  parameterCandidates: z.array(parameterCandidateSchema),
+  extractionCandidates: z.array(extractionCandidateSchema),
+  generatedAt: z.string().min(1)
+});
+
+export const parameterInferenceConfigSchema = z.object({
+  enabled: z.boolean().default(true),
+  minimumConfidence: confidenceSchema.default(0.75),
+  fieldNameHints: z.array(z.string()).default([])
+});
+
+export const responseMappingConfigSchema = z.object({
+  enabled: z.boolean().default(true),
+  minimumConfidence: confidenceSchema.default(0.75),
+  labelHints: z.array(z.string()).default([])
 });
 
 export const filtersConfigSchema = z.object({
@@ -72,7 +116,9 @@ export const appConfigSchema = z.object({
   redactionRules: z.array(redactionRuleSchema),
   domainFlowDefinitions: z.array(domainFlowDefinitionSchema),
   domainSequenceRules: z.array(domainSequenceRuleSchema),
-  exportFormats: z.array(z.enum(["axios", "httpx", "curl", "fetch", "markdown"]))
+  exportFormats: z.array(z.enum(["axios", "httpx", "curl", "fetch", "markdown", "smart"])),
+  parameterInference: parameterInferenceConfigSchema,
+  responseMapping: responseMappingConfigSchema
 });
 
 const keyValueSchema = z.record(z.string(), z.union([z.string(), z.array(z.string())]));
@@ -123,7 +169,8 @@ export const requestRecordSchema = z.object({
   autoObservations: z.array(z.string()),
   manuallyImportant: z.boolean(),
   notes: z.array(z.string()),
-  ignoredReason: z.string().optional()
+  ignoredReason: z.string().optional(),
+  automationPlan: automationPlanSchema.optional()
 });
 
 export const flowGroupSchema = z.object({

@@ -4,6 +4,7 @@ import type { AppConfig } from "../types/config";
 import type { ExportArtifact, RequestRecord } from "../types/network";
 import { saveText } from "../storage/saveJson";
 import { stableStringify } from "../utils/json";
+import { exportSmartArtifacts } from "./smartExporter";
 import { buildExportHeaders } from "./shared";
 
 const methodsWithoutBody = new Set(["GET", "HEAD", "OPTIONS"]);
@@ -16,24 +17,20 @@ function buildFetchSnippet(record: RequestRecord): string {
 
   const bodyLine = hasBody ? `  body: JSON.stringify(${stableStringify(record.request.body)}),\n` : "";
 
-  return `const response = await fetch(
-  \`<BASE_URL>${requestPath}\`,
-  {
-    method: "${record.request.method}",
-    headers: ${headers},
-${bodyLine}  }
-);
-
-const data = await response.json();
-console.log(response.status, data);
-`;
+  return `const response = await fetch(\n  \`<BASE_URL>${requestPath}\`,\n  {\n    method: ${JSON.stringify(record.request.method)},\n    headers: ${headers},\n${bodyLine}  }\n);\n\nconst data = await response.json();\nconsole.log(response.status, data);\n`;
 }
 
 export async function exportFetchArtifacts(records: RequestRecord[], config: AppConfig): Promise<ExportArtifact[]> {
-  const outputDir = path.join(config.outputDirectory, "exports", "fetch");
+  const automationRecords = records.filter((record) => record.automationPlan);
+  const classicRecords = records.filter((record) => !record.automationPlan);
   const artifacts: ExportArtifact[] = [];
 
-  for (const record of records) {
+  if (automationRecords.length > 0) {
+    artifacts.push(...await exportSmartArtifacts(automationRecords, config, "fetch"));
+  }
+
+  const outputDir = path.join(config.outputDirectory, "exports", "fetch");
+  for (const record of classicRecords) {
     const snippet = buildFetchSnippet(record);
     const filePath = path.join(outputDir, `request-${record.request.id}.ts`);
     await saveText(filePath, snippet);

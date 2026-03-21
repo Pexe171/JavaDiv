@@ -1,4 +1,4 @@
-export type ExportFormat = "axios" | "httpx" | "curl" | "fetch" | "markdown";
+export type ExportFormat = "axios" | "httpx" | "curl" | "fetch" | "markdown" | "smart";
 export type RedactionTarget = "headers" | "body" | "query" | "all";
 
 export interface DomainFlowDefinition {
@@ -30,6 +30,18 @@ export interface RedactionRule {
   valuePattern?: string | undefined;
 }
 
+export interface ParameterInferenceConfig {
+  enabled: boolean;
+  minimumConfidence: number;
+  fieldNameHints: string[];
+}
+
+export interface ResponseMappingConfig {
+  enabled: boolean;
+  minimumConfidence: number;
+  labelHints: string[];
+}
+
 export interface AppConfig {
   outputDirectory: string;
   sessionDirectory: string;
@@ -53,6 +65,8 @@ export interface AppConfig {
   domainFlowDefinitions: DomainFlowDefinition[];
   domainSequenceRules: DomainSequenceRule[];
   exportFormats: ExportFormat[];
+  parameterInference: ParameterInferenceConfig;
+  responseMapping: ResponseMappingConfig;
 }
 
 export interface SessionState {

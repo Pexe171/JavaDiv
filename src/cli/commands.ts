@@ -8,6 +8,7 @@ import { exportAxiosArtifacts } from "../exporters/axiosExporter";
 import { exportCurlArtifacts } from "../exporters/curlExporter";
 import { exportFetchArtifacts } from "../exporters/fetchExporter";
 import { exportHttpxArtifacts } from "../exporters/httpxExporter";
+import { exportSmartArtifacts } from "../exporters/smartExporter";
 import { NetworkInterceptor } from "../network/interceptor";
 import { ensureRuntimeDirectories } from "../storage/fileManager";
 import type { AppConfig } from "../types/config";
@@ -131,7 +132,13 @@ async function runExportCommand(
     return;
   }
 
-  if (options.format === "axios") {
+  if (options.format === "smart") {
+    const smartRecords = filteredRecords.map((record) => ({
+      ...record,
+      automationPlan: record.automationPlan
+    }));
+    await exportSmartArtifacts(smartRecords, config, "fetch");
+  } else if (options.format === "axios") {
     await exportAxiosArtifacts(filteredRecords, config);
   } else if (options.format === "httpx") {
     await exportHttpxArtifacts(filteredRecords, config);
@@ -198,7 +205,7 @@ export function createCli(): Command {
   program
     .command("export")
     .description("Gera artefatos sanitizados para integração legítima.")
-    .requiredOption("--format <format>", "Formato: axios, httpx, curl ou fetch")
+    .requiredOption("--format <format>", "Formato: axios, httpx, curl, fetch ou smart")
     .option("--input <directory>", "Diretório com request JSONs")
     .option("--request-id <ids...>", "Exporta apenas request IDs específicos")
     .option("--debug", "Ativa logs detalhados")

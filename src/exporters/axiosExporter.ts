@@ -4,6 +4,7 @@ import type { AppConfig } from "../types/config";
 import type { ExportArtifact, RequestRecord } from "../types/network";
 import { saveText } from "../storage/saveJson";
 import { stableStringify } from "../utils/json";
+import { exportSmartArtifacts } from "./smartExporter";
 import { buildExportHeaders } from "./shared";
 
 function buildPayload(body: unknown): string {
@@ -22,37 +23,24 @@ function buildAxiosSnippet(record: RequestRecord): string {
   const requestPath = `${url.pathname}${url.search}`;
 
   if (methodsWithoutBody.has(record.request.method)) {
-    return `import axios from "axios";
-
-await axios.${method}(
-  \`<BASE_URL>${requestPath}\`,
-  {
-    headers: ${headers}
-  }
-);
-`;
+    return `import axios from "axios";\n\nawait axios.${method}(\n  \`<BASE_URL>${requestPath}\`,\n  {\n    headers: ${headers}\n  }\n);\n`;
   }
 
   const payload = buildPayload(record.request.body);
-  return `import axios from "axios";
-
-const payload = ${payload};
-
-await axios.${method}(
-  \`<BASE_URL>${requestPath}\`,
-  payload,
-  {
-    headers: ${headers}
-  }
-);
-`;
+  return `import axios from "axios";\n\nconst payload = ${payload};\n\nawait axios.${method}(\n  \`<BASE_URL>${requestPath}\`,\n  payload,\n  {\n    headers: ${headers}\n  }\n);\n`;
 }
 
 export async function exportAxiosArtifacts(records: RequestRecord[], config: AppConfig): Promise<ExportArtifact[]> {
-  const outputDir = path.join(config.outputDirectory, "exports", "axios");
+  const automationRecords = records.filter((record) => record.automationPlan);
+  const classicRecords = records.filter((record) => !record.automationPlan);
   const artifacts: ExportArtifact[] = [];
 
-  for (const record of records) {
+  if (automationRecords.length > 0) {
+    artifacts.push(...await exportSmartArtifacts(automationRecords, config, "axios"));
+  }
+
+  const outputDir = path.join(config.outputDirectory, "exports", "axios");
+  for (const record of classicRecords) {
     const snippet = buildAxiosSnippet(record);
     const filePath = path.join(outputDir, `request-${record.request.id}.ts`);
     await saveText(filePath, snippet);

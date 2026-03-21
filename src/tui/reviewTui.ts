@@ -4,6 +4,8 @@ import { exportAxiosArtifacts } from "../exporters/axiosExporter";
 import { exportCurlArtifacts } from "../exporters/curlExporter";
 import { exportFetchArtifacts } from "../exporters/fetchExporter";
 import { exportHttpxArtifacts } from "../exporters/httpxExporter";
+import { buildAutomationPlan } from "../automation/automationBlueprint";
+import { reviewAutomationPlan } from "./automationPrompts";
 import type { AnalysisWorkspace } from "../cli/workspace";
 import { persistSessionArtifacts, regroupRecords } from "../cli/workspace";
 import type { AppConfig, ExportFormat } from "../types/config";
@@ -116,6 +118,8 @@ export class ReviewTui {
         this.regroup();
       } else if (input === "e") {
         await this.exportSelectedRequest();
+      } else if (input === "a") {
+        await this.generateSmartAutomation();
       } else if (input === "s" || input === "w") {
         await this.save();
       } else if (input === "q" || key.name === "escape") {
@@ -268,6 +272,47 @@ export class ReviewTui {
     this.message = `Exportação ${selectedFormat} gerada para ${record.request.id}.`;
   }
 
+  private async generateSmartAutomation(): Promise<void> {
+    const record = this.getSelectedRequest();
+    if (!record) {
+      this.message = "Nenhuma request selecionada para automação inteligente.";
+      return;
+    }
+
+    if (!record.response) {
+      this.message = "A automação inteligente exige uma response capturada.";
+      return;
+    }
+
+    const basePlan = buildAutomationPlan(record);
+    if (basePlan.parameterCandidates.length === 0 && basePlan.extractionCandidates.length === 0) {
+      this.message = "Nenhum parâmetro ou resultado relevante foi inferido automaticamente.";
+      return;
+    }
+
+    const reviewedPlan = await reviewAutomationPlan((question) => this.prompt(question), basePlan);
+    const selectedFormat = (await this.prompt("Formato da automação inteligente (axios/httpx/curl/fetch): ")).trim().toLowerCase() as ExportFormat;
+    if (!["axios", "httpx", "curl", "fetch"].includes(selectedFormat)) {
+      this.message = "Formato inválido. Use axios, httpx, curl ou fetch.";
+      return;
+    }
+
+    record.automationPlan = reviewedPlan;
+    if (selectedFormat === "axios") {
+      await exportAxiosArtifacts([record], this.options.config);
+    } else if (selectedFormat === "httpx") {
+      await exportHttpxArtifacts([record], this.options.config);
+    } else if (selectedFormat === "fetch") {
+      await exportFetchArtifacts([record], this.options.config);
+    } else {
+      await exportCurlArtifacts([record], this.options.config);
+    }
+
+    this.dirty = true;
+    this.quitArmed = false;
+    this.message = `Automação inteligente ${selectedFormat} gerada para ${record.request.id}.`;
+  }
+
   private async save(): Promise<void> {
     const summary = await persistSessionArtifacts(
       this.options.workspace.records,
@@ -341,7 +386,7 @@ export class ReviewTui {
     const headerLines = [
       "HTTP Traffic Observability - Interactive TUI",
       `Fluxos: ${flows.length} | Requests: ${this.options.workspace.records.length} | Filtro: ${this.filterMode} | Painel ativo: ${this.activePane} | Alterações pendentes: ${this.dirty ? "sim" : "não"}`,
-      "Teclas: Tab alterna painel | j/k navega | i importante | n nota | r renomear flow | g reagrupar | e exportar | s salvar | q sair",
+      "Teclas: Tab alterna painel | j/k navega | i importante | n nota | r renomear flow | g reagrupar | e exportar | a automação | s salvar | q sair",
       `Mensagem: ${this.message}`
     ];
 

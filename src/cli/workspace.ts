@@ -74,7 +74,14 @@ export function resanitizeRecords(records: RequestRecord[], config: AppConfig): 
       notes: [...record.notes],
       scoreReasons: [...record.scoreReasons],
       autoObservations: [...record.autoObservations],
-      domainSignals: [...record.domainSignals]
+      domainSignals: [...record.domainSignals],
+      automationPlan: record.automationPlan
+        ? {
+            ...record.automationPlan,
+            parameterCandidates: record.automationPlan.parameterCandidates.map((candidate) => ({ ...candidate })),
+            extractionCandidates: record.automationPlan.extractionCandidates.map((candidate) => ({ ...candidate }))
+          }
+        : undefined
     };
   });
 }
@@ -90,7 +97,14 @@ export function reclassifyRecords(records: RequestRecord[], config: AppConfig): 
       domainSignals: [],
       scoreReasons: [],
       autoObservations: [],
-      notes: [...record.notes]
+      notes: [...record.notes],
+      automationPlan: record.automationPlan
+        ? {
+            ...record.automationPlan,
+            parameterCandidates: record.automationPlan.parameterCandidates.map((candidate) => ({ ...candidate })),
+            extractionCandidates: record.automationPlan.extractionCandidates.map((candidate) => ({ ...candidate }))
+          }
+        : undefined
     };
 
     const classification = classifier.classify(updatedRecord, reclassified.slice(-10));
@@ -135,7 +149,14 @@ export function applyManualAdjustments(
       domainSignals: [...record.domainSignals],
       scoreReasons: [...record.scoreReasons],
       autoObservations: [...record.autoObservations],
-      notes: [...record.notes]
+      notes: [...record.notes],
+      automationPlan: record.automationPlan
+        ? {
+            ...record.automationPlan,
+            parameterCandidates: record.automationPlan.parameterCandidates.map((candidate) => ({ ...candidate })),
+            extractionCandidates: record.automationPlan.extractionCandidates.map((candidate) => ({ ...candidate }))
+          }
+        : undefined
     };
 
     if (importantIds.has(record.request.id)) {

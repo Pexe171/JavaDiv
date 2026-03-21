@@ -31,7 +31,7 @@
 | 🌐 Captura | Observa `fetch`/`xhr` no Chromium visível | Requests relevantes identificadas em tempo real |
 | 🧼 Sanitização | Redige headers, cookies, tokens, PII e campos sensíveis | Artefatos seguros para persistência |
 | 🧠 Análise | Classifica relevância e agrupa requests por fluxo funcional | Leitura de jornadas e troubleshooting |
-| 📤 Exportação | Gera Axios, HTTPX, cURL, Fetch e Markdown | Reuso técnico e documentação |
+| 📤 Exportação | Gera Axios, HTTPX, cURL, Fetch, Markdown e automações inteligentes | Reuso técnico, documentação e simuladores reutilizáveis |
 | 🖥️ Revisão | Permite análise offline e TUI interativa | Curadoria manual dos artefatos |
 
 ### Casos de uso ideais
@@ -121,6 +121,7 @@ mindmap
       cURL
       Fetch API
       Markdown
+      Automação inteligente
     Saída
       requests
       flows
@@ -172,7 +173,10 @@ npm run dev -- export --format axios
 npm run dev -- export --format httpx
 npm run dev -- export --format curl
 npm run dev -- export --format fetch
+npm run dev -- export --format smart
 ```
+
+A exportação `smart` usa o plano de automação salvo na request, quando existir, e gera uma função parametrizada com extração de resultados.
 
 Exportando uma request específica:
 
@@ -188,6 +192,19 @@ Gere um relatório consolidado:
 npm run dev -- report
 npm run dev -- report ./logs/requests
 ```
+
+
+### Automação inteligente na TUI
+
+Ao revisar uma request final de fluxo na TUI, use a tecla `a` para abrir o fluxo **Gerar Automação Inteligente**:
+
+1. o motor sugere quais campos do payload viram argumentos da função;
+2. você confirma ou renomeia cada variável;
+3. o motor sugere quais resultados finais devem ser extraídos da resposta;
+4. você confirma quais campos entram no retorno;
+5. o artefato exportado passa a retornar um objeto limpo com os resultados da simulação.
+
+Os metadados dessa revisão ficam persistidos junto da request sanitizada, permitindo reexportação posterior.
 
 ---
 
@@ -232,6 +249,7 @@ npm run build
 | `r` | renomeia flow |
 | `g` | reaplica heurísticas de agrupamento |
 | `e` | exporta a request atual |
+| `a` | gera automação inteligente da request atual |
 | `s` | salva artefatos revisados |
 | `q` | sai da TUI |
 

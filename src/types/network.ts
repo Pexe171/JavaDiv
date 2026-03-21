@@ -1,3 +1,5 @@
+import type { AutomationPlan } from "../automation/types";
+
 export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS" | "HEAD";
 export type RelevanceScore = "LOW" | "MEDIUM" | "HIGH";
 
@@ -48,6 +50,7 @@ export interface RequestRecord {
   manuallyImportant: boolean;
   notes: string[];
   ignoredReason?: string | undefined;
+  automationPlan?: AutomationPlan | undefined;
 }
 
 export interface ExportArtifact {
@@ -55,4 +58,5 @@ export interface ExportArtifact {
   filePath: string;
   requestId?: string | undefined;
   content: string;
+  automation?: boolean | undefined;
 }
